@@ -1,7 +1,17 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_URL as DEFAULT_SUPABASE_URL, SUPABASE_ANON_KEY as DEFAULT_SUPABASE_ANON_KEY } from './config.js';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {};
+const SUPABASE_URL = (env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL || '').trim();
+const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY || '').trim();
+
+const configError = !SUPABASE_URL || !SUPABASE_ANON_KEY
+  ? 'Thiếu biến môi trường VITE_SUPABASE_URL hoặc VITE_SUPABASE_ANON_KEY. Vui lòng cập nhật file config.js hoặc biến môi trường trước khi đăng nhập.'
+  : SUPABASE_ANON_KEY.includes('service_role')
+    ? 'Khóa Supabase đang dùng là service_role key. Vui lòng dùng VITE_SUPABASE_ANON_KEY (khóa công khai) cho ứng dụng này.'
+    : '';
+
+const supabase = configError ? null : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const QUIZ_DRAFT_KEY = 'politics_quiz_draft';
 
 const elements = {
@@ -64,6 +74,9 @@ function setAuthMode(mode) {
   const showConfirm = mode === 'register';
   elements.confirmPasswordInput.hidden = !showConfirm;
   elements.confirmPasswordLabel.hidden = !showConfirm;
+  if (!showConfirm) {
+    elements.confirmPasswordInput.value = '';
+  }
 }
 
 function updateUserUI(session) {
@@ -81,6 +94,11 @@ function updateUserUI(session) {
 }
 
 async function checkSession() {
+  if (configError) {
+    setStatus(configError, 'error');
+    return;
+  }
+
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error) throw error;
@@ -96,6 +114,12 @@ async function checkSession() {
 
 async function handleAuthSubmit(event) {
   event.preventDefault();
+
+  if (configError) {
+    setStatus(configError, 'error');
+    return;
+  }
+
   const email = elements.emailInput.value.trim();
   const password = elements.passwordInput.value.trim();
 
@@ -141,6 +165,11 @@ async function handleAuthSubmit(event) {
 }
 
 async function handleLogout() {
+  if (configError) {
+    setStatus(configError, 'error');
+    return;
+  }
+
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -193,6 +222,11 @@ function clearDraft() {
 }
 
 async function startQuiz(totalQuestions, minutes) {
+  if (configError) {
+    setStatus(configError, 'error');
+    return;
+  }
+
   currentMode = 'quiz';
   questionCount = totalQuestions;
   durationMinutes = minutes;
@@ -354,6 +388,11 @@ function goToNextQuestion() {
 }
 
 async function submitQuiz() {
+  if (configError) {
+    setStatus(configError, 'error');
+    return;
+  }
+
   if (!questions.length) return;
   const confirmed = window.confirm('Bạn có chắc chắn muốn nộp bài không?');
   if (!confirmed) return;
@@ -395,6 +434,11 @@ async function submitQuiz() {
 }
 
 async function loadHistory() {
+  if (configError) {
+    elements.historyTableBody.innerHTML = '<tr><td colspan="7">Cấu hình Supabase chưa hợp lệ. Vui lòng cập nhật VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.</td></tr>';
+    return;
+  }
+
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData?.session?.user) {
@@ -465,6 +509,10 @@ function wireEvents() {
 window.addEventListener('beforeunload', stopTimer);
 
 (async function init() {
+  if (configError) {
+    setStatus(configError, 'error');
+  }
+
   wireEvents();
   setAuthMode('login');
   await checkSession();
@@ -486,6 +534,10 @@ window.addEventListener('beforeunload', stopTimer);
     startTimer();
     renderQuestion();
   }
+  if (configError) {
+    return;
+  }
+
   let isInitialAuthState = true;
   supabase.auth.onAuthStateChange((_event, session) => {
     if (isInitialAuthState) {

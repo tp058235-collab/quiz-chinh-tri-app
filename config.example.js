@@ -1,2 +1,7 @@
 export const SUPABASE_URL = "DAN_SUPABASE_URL_CUA_BAN_O_DAY";
 export const SUPABASE_ANON_KEY = "DAN_SUPABASE_ANON_KEY_CUA_BAN_O_DAY";
+
+// Nếu dùng Vite, hãy đặt:
+// VITE_SUPABASE_URL=...
+// VITE_SUPABASE_ANON_KEY=...
+// Không dùng service_role key trong frontend.
