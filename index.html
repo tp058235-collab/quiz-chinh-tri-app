@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz Chinh Tri App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar hero-header">
+        <div class="hero-copy">
+          <p class="eyebrow hero-kicker">ỨNG DỤNG TRẮC NGHIỆM</p>
+          <h1>ÔN TẬP CHÍNH TRỊ</h1>
+        </div>
+        <div class="topbar-actions">
+          <div id="userBadge" class="user-badge" hidden>
+            <span id="userEmail">user@example.com</span>
+          </div>
+          <button id="logoutBtn" class="ghost-btn" hidden>Đăng xuất</button>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section id="authSection" class="panel auth-panel">
+          <div class="intro-card">
+            <p class="eyebrow">Chào mừng</p>
+            <h2>Đăng nhập hoặc tạo tài khoản để bắt đầu</h2>
+            <p class="muted-text">
+              Ứng dụng đọc cấu hình từ Supabase, không hiển thị URL hoặc khóa công khai trong giao diện.
+            </p>
+          </div>
+
+          <div class="auth-mode-switch" role="tablist" aria-label="Chế độ xác thực">
+            <button class="mode-chip active" data-auth-mode="login">Đăng nhập</button>
+            <button class="mode-chip" data-auth-mode="register">Đăng ký</button>
+          </div>
+
+          <form id="authForm" class="auth-form">
+            <label for="emailInput">Email</label>
+            <input id="emailInput" type="email" placeholder="you@example.com" required />
+
+            <label for="passwordInput">Mật khẩu</label>
+            <input id="passwordInput" type="password" placeholder="••••••••" required />
+
+            <label for="confirmPasswordInput" id="confirmPasswordLabel" hidden>Nhập lại mật khẩu</label>
+            <input id="confirmPasswordInput" type="password" placeholder="Nhập lại mật khẩu" hidden />
+
+            <button id="authSubmitBtn" class="primary-btn" type="submit">Đăng nhập</button>
+          </form>
+
+          <p id="authMessage" class="status-text" aria-live="polite"></p>
+        </section>
+
+        <section id="dashboardSection" class="panel" hidden>
+          <div class="hero-card">
+            <p class="eyebrow">Chọn chế độ luyện tập</p>
+            <h2>Chọn một bộ đề phù hợp với thời gian của bạn</h2>
+            <p class="muted-text">
+              Mỗi lần bắt đầu, hệ thống sẽ lấy câu hỏi ngẫu nhiên từ Supabase bằng RPC.
+            </p>
+          </div>
+
+          <div class="mode-grid">
+            <button class="mode-card" data-mode="30" data-time="20">
+              <strong>30 câu</strong>
+              <span>20 phút</span>
+            </button>
+            <button class="mode-card" data-mode="70" data-time="60">
+              <strong>70 câu</strong>
+              <span>60 phút</span>
+            </button>
+          </div>
+
+          <section class="history-card">
+            <div class="section-header">
+              <div>
+                <p class="eyebrow">Lịch sử làm bài</p>
+                <h3>Lịch sử của tài khoản hiện tại</h3>
+              </div>
+              <button id="refreshHistoryBtn" class="ghost-btn">Làm mới</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Chế độ</th>
+                    <th>Tổng câu</th>
+                    <th>Đúng</th>
+                    <th>Sai</th>
+                    <th>Điểm %</th>
+                    <th>Thời lượng</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="quizSection" class="panel" hidden>
+          <div class="quiz-header">
+            <div>
+              <p class="eyebrow">Đang làm bài</p>
+              <h2 id="quizTitle">Bộ đề</h2>
+            </div>
+            <div class="timer-badge" id="timerBadge">00:00</div>
+          </div>
+
+          <div id="quizStatus" class="quiz-status muted-text">Đang chuẩn bị câu hỏi...</div>
+          <div id="quizCard" class="quiz-card"></div>
+          <div class="quiz-actions">
+            <button id="nextQuestionBtn" class="primary-btn" hidden>Câu tiếp theo</button>
+            <button id="submitQuizBtn" class="primary-btn" hidden>Nộp bài</button>
+          </div>
+        </section>
+
+        <aside id="aboutCard" class="panel about-card">
+          <p class="eyebrow">Giới thiệu</p>
+          <h3>Người tạo ứng dụng</h3>
+          <ul class="about-list">
+            <li>Phạm Nghĩa Trọng</li>
+            <li>Khoa CNTT</li>
+            <li>Trường Cao đẳng Công nghệ Thủ Đức</li>
+          </ul>
+          <p class="muted-text">Ứng dụng dùng Supabase Authentication và RPC để quản lý bài làm.</p>
+        </aside>
+      </main>
+
+      <footer class="app-footer">
+        <p>Đóng góp ý kiến về ứng dụng</p>
+        <p><a href="mailto:tp058235@gmail.com">Mọi góp ý xin gửi về: tp058235@gmail.com</a></p>
+      </footer>
+
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
