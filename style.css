@@ -190,6 +190,13 @@ button, input { font: inherit; }
   flex: 1;
 }
 
+/* Mobile menu (ẩn trên desktop) */
+.mobile-menu { display: none; }
+.mobile-menu-toggle { width: 100%; justify-content: center; }
+.mobile-menu-panel { display: none; margin-top: 10px; }
+.mobile-menu.open .mobile-menu-panel { display: grid; gap: 10px; }
+
+
 .app-content {
   flex: 1;
   min-width: 0;
@@ -715,10 +722,16 @@ footer a:hover { text-decoration: underline; }
 
 @media (max-width: 768px) {
   .app-shell { width: min(100%, calc(100% - 20px)); padding: 16px 0 24px; }
-  .sidebar { width: 82px; }
-  .sidebar-label { display: none; }
 
-  
+  /* Ẩn sidebar dọc trên mobile, thay bằng mobile-menu ở trên nội dung */
+  .sidebar { display: none !important; }
+  .app-frame { flex-direction: column; gap: 14px; }
+  .mobile-menu { display: block; }
+  .mobile-menu-toggle { display: flex; align-items: center; gap: 10px; }
+  .mobile-menu-panel .sidebar-item { width: 100%; justify-content: flex-start; }
+
+  /* Không cuộn ngang, menu chữ đủ rộng */
+  html, body { overflow-x: hidden; }
 
   .topbar, .quiz-header, .section-header { flex-direction: column; align-items: center; text-align: center; }
   .topbar-actions { width: 100%; justify-content: center; flex-wrap: wrap; }
@@ -726,6 +739,7 @@ footer a:hover { text-decoration: underline; }
   .auth-form input, .primary-btn, .ghost-btn, .mode-card, .option-btn { width: 100%; }
   .quiz-actions { flex-direction: column; }
 }
+
 
 
 @media (max-width: 640px) {

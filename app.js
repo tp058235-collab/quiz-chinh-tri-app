@@ -95,9 +95,15 @@ const elements = {
   appInfoCard: document.getElementById('appInfoCard'),
 
   feedbackSection: document.getElementById('feedbackSection'),
-  feedbackInput: document.getElementById('feedbackInput'),
+    feedbackInput: document.getElementById('feedbackInput'),
   sendFeedbackBtn: document.getElementById('sendFeedbackBtn'),
+
+  // Mobile menu elements (created dynamically)
+  mobileMenu: document.getElementById('mobileMenu'),
+  mobileMenuToggle: document.getElementById('mobileMenuToggle'),
+  mobileMenuPanel: document.getElementById('mobileMenuPanel'),
 };
+
 
 
 
@@ -562,11 +568,8 @@ function setSidebarCollapsed(collapsed) {
 
 function updateHomeCaret() {
   const caret = document.querySelector('#sidebarToggle .sidebar-caret');
-  if (!caret) return;
-  const collapsed = document.body.classList.contains('sidebar-collapsed');
-  // collapsed -> show '›' (points right), expanded -> '‹' (points left)
-  caret.textContent = collapsed ? '›' : '‹';
-}
+  const label = document.querySelector('#sidebarToggle .sidebar-label');
+
 
 
 
@@ -770,7 +773,77 @@ async function loadLessons() {
   }
 }
 
+function ensureMobileMenuUI() {
+  const frame = document.querySelector('.app-frame');
+  const content = document.querySelector('.app-content');
+  if (!frame || !content) return;
+
+  // Create once
+  if (document.getElementById('mobileMenu')) {
+    elements.mobileMenu = document.getElementById('mobileMenu');
+    elements.mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    elements.mobileMenuPanel = document.getElementById('mobileMenuPanel');
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.id = 'mobileMenu';
+  wrap.className = 'mobile-menu';
+
+  const toggle = document.createElement('button');
+  toggle.id = 'mobileMenuToggle';
+  toggle.className = 'mobile-menu-toggle sidebar-item';
+  toggle.type = 'button';
+  toggle.innerHTML = '<span class="sidebar-icon">☰</span><span class="sidebar-label">Menu</span><span class="sidebar-caret" aria-hidden="true">▼</span>';
+
+  const panel = document.createElement('div');
+  panel.id = 'mobileMenuPanel';
+  panel.className = 'mobile-menu-panel';
+
+  // Build items based on existing sidebar items, filter out account (đã gộp với user)
+  const items = Array.from(document.querySelectorAll('.sidebar-item[data-nav]'))
+    .filter((btn) => btn.dataset.nav !== 'account');
+
+  items.forEach((src) => {
+    const btn = document.createElement('button');
+    btn.className = 'sidebar-item';
+    btn.type = 'button';
+    btn.dataset.nav = src.dataset.nav || '';
+    btn.title = src.title || '';
+
+    const icon = src.querySelector('.sidebar-icon')?.textContent || '';
+    const label = src.querySelector('.sidebar-label')?.textContent || '';
+    btn.innerHTML = `<span class="sidebar-icon">${icon}</span><span class="sidebar-label">${label}</span>`;
+
+    btn.addEventListener('click', () => {
+      navigateFromSidebar(btn.dataset.nav);
+      // close after navigate
+      wrap.classList.remove('open');
+      const caret = toggle.querySelector('.sidebar-caret');
+      if (caret) caret.textContent = '▼';
+    });
+
+    panel.appendChild(btn);
+  });
+
+  toggle.addEventListener('click', () => {
+    wrap.classList.toggle('open');
+    const caret = toggle.querySelector('.sidebar-caret');
+    if (caret) caret.textContent = wrap.classList.contains('open') ? '▲' : '▼';
+  });
+
+  wrap.appendChild(toggle);
+  wrap.appendChild(panel);
+  // Insert above app-content so it sits on top of content column
+  frame.insertBefore(wrap, content);
+
+  elements.mobileMenu = wrap;
+  elements.mobileMenuToggle = toggle;
+  elements.mobileMenuPanel = panel;
+}
+
 function setupHomeViewLayout() {
+
   if (!elements.homeView) return;
 
   // Tách LUYỆN TẬP và THI THỬ thành 2 card riêng, có khoảng cách rõ ràng
@@ -2214,8 +2287,12 @@ document.addEventListener('visibilitychange', () => {
     // Tách layout Luyện tập / Thi thử (chỉ DOM client-side, không đổi HTML gốc)
     setupHomeViewLayout();
 
+    // Mobile menu on small screens
+    ensureMobileMenuUI();
+
     ensureForgotPasswordUI();
     ensureAccountPasswordUI();
+
 
 
   // Thêm nút điều hướng câu hỏi trong màn hình làm bài
