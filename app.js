@@ -2001,7 +2001,7 @@ async function loadLeaderboard() {
 }
 
 
-function wireEvents() {
+
 function wireEvents() {
   // Xóa nút "Tài khoản" khỏi menu chính (chỉ dùng ô user ở cuối sidebar để vào trang Tài khoản)
   const accountNavBtn = document.querySelector('.sidebar-item[data-nav="account"]');
@@ -2220,7 +2220,7 @@ document.addEventListener('visibilitychange', () => {
 
   // Thêm nút điều hướng câu hỏi trong màn hình làm bài
   setupQuizNavigationButtons();
-  ensureMobileMenuButton();
+ 
   wireEvents();
 
 
