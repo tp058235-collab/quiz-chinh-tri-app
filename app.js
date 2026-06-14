@@ -1081,7 +1081,7 @@ async function handleAuthSubmit(event) {
       });
       if (error) throw error;
 
-      setStatus('Đăng ký thành công. Vui lòng kiểm tra email xác nhận nếu cần.', 'success');
+      setStatus('Đăng ký thành công. Có thể kiểm tra email xác nhận trong mục thư rác của bạn nếu không thấy.', 'success');
 
             if (data?.session) {
         updateUserUI(data.session);
