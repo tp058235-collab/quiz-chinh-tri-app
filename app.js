@@ -311,7 +311,7 @@ async function sendResetEmail() {
     });
     if (error) throw error;
 
-    setStatus('Đã gửi email đặt lại mật khẩu.', 'success');
+    setStatus('Đã gửi email đặt lại mật khẩu. Có thể kiểm tra email đặt lại mật khẩu trong mục thư rác của bạn nếu không thấy.', 'success');
     cancelForgotPassword();
   } catch (error) {
     console.error(error);
