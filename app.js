@@ -569,9 +569,16 @@ function setSidebarCollapsed(collapsed) {
 function updateHomeCaret() {
   const caret = document.querySelector('#sidebarToggle .sidebar-caret');
   const label = document.querySelector('#sidebarToggle .sidebar-label');
+  const toggle = document.getElementById('sidebarToggle');
 
+  const collapsed = document.body.classList.contains('sidebar-collapsed');
 
-
+  // Khi sidebar đang mở: caret hướng vào trong (‹) để gợi ý "thu gọn".
+  // Khi sidebar đang thu gọn: caret hướng ra ngoài (›) để gợi ý "mở rộng".
+  if (caret) caret.textContent = collapsed ? '›' : '‹';
+  if (label) label.textContent = collapsed ? 'Mở rộng menu' : 'Thu gọn menu';
+  if (toggle) toggle.title = collapsed ? 'Mở rộng menu' : 'Thu gọn menu';
+}
 
 function getSidebarCollapsed() {
   const raw = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
