@@ -1,46 +1,171 @@
 :root {
   color-scheme: dark;
   --bg: #07111f;
-  --panel: rgba(10, 20, 34, 0.88);
-  --panel-2: rgba(14, 30, 49, 0.95);
-  --line: rgba(148, 163, 184, 0.18);
+
+  /* Glassmorphism tokens */
+  --glass: rgba(10, 22, 38, 0.48);
+  --glass-strong: rgba(10, 22, 38, 0.58);
+  --glass-soft: rgba(10, 22, 38, 0.40);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-line: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+
+  --panel: var(--glass);
+  --panel-2: rgba(10, 22, 38, 0.42);
+  --line: rgba(255, 255, 255, 0.12);
+
   --text: #edf4ff;
   --muted: #bfd3ee;
   --accent: #7c9cff;
   --accent-2: #44d8b8;
   --danger: #ff7b7b;
   --success: #77efb5;
-  --shadow: 0 18px 40px rgba(5, 10, 20, 0.35);
+  --shadow: var(--glass-shadow);
 }
 
+
 * { box-sizing: border-box; }
+
+/* Đảm bảo thuộc tính HTML hidden luôn ẩn phần tử, kể cả khi CSS có display:flex/grid */
+[hidden] { display: none !important; }
+
 html, body { width: 100%; overflow-x: hidden; }
+
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
   color: var(--text);
   min-height: 100vh;
   position: relative;
+  isolation: isolate;
+
   background:
     radial-gradient(circle at 20% 15%, rgba(45, 212, 191, 0.18), transparent 28%),
     radial-gradient(circle at 82% 8%, rgba(59, 130, 246, 0.16), transparent 30%),
     linear-gradient(135deg, #06111f 0%, #07111f 55%, #04101b 100%);
 }
+/* Nền "mây" 7 màu chạy vòng quanh màn hình (mềm, mờ, tự nhiên) */
 body::before {
   content: "";
   position: fixed;
-  inset: -10%;
-  z-index: -1;
-  background:
-    linear-gradient(115deg, transparent 35%, rgba(45, 212, 191, 0.08), transparent 65%),
-    linear-gradient(245deg, transparent 35%, rgba(96, 165, 250, 0.06), transparent 65%);
-  animation: softWave 14s ease-in-out infinite alternate;
+  inset: -30%;
+  z-index: 0;
   pointer-events: none;
+
+  opacity: 0.22;
+  mix-blend-mode: screen;
+  filter: blur(90px) saturate(1.2);
+
+  background-image:
+    radial-gradient(closest-side, rgba(255, 90, 90, 0.22), transparent 70%),
+    radial-gradient(closest-side, rgba(255, 170, 70, 0.20), transparent 70%),
+    radial-gradient(closest-side, rgba(255, 235, 120, 0.18), transparent 70%),
+    radial-gradient(closest-side, rgba(110, 255, 190, 0.20), transparent 70%),
+    radial-gradient(closest-side, rgba(70, 210, 255, 0.20), transparent 70%),
+    radial-gradient(closest-side, rgba(124, 156, 255, 0.22), transparent 70%),
+    radial-gradient(closest-side, rgba(200, 140, 255, 0.18), transparent 70%);
+
+  background-repeat: no-repeat;
+  background-size:
+    60vmax 60vmax,
+    55vmax 55vmax,
+    65vmax 65vmax,
+    62vmax 62vmax,
+    58vmax 58vmax,
+    66vmax 66vmax,
+    54vmax 54vmax;
+
+  background-position:
+    10% 25%,
+    78% 18%,
+    46% 72%,
+    18% 78%,
+    82% 62%,
+    55% 10%,
+    8% 55%;
+
+  animation: rainbowCloudsA 24s linear infinite;
 }
-@keyframes softWave {
-  from { transform: translate3d(-2%, -1%, 0) rotate(0deg); }
-  to { transform: translate3d(2%, 1%, 0) rotate(2deg); }
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+
+  opacity: 0.28;
+  mix-blend-mode: screen;
+  filter: blur(70px) saturate(1.15);
+
+  background-image:
+    radial-gradient(closest-side, rgba(45, 212, 191, 0.22), transparent 72%),
+    radial-gradient(closest-side, rgba(59, 130, 246, 0.20), transparent 72%),
+    radial-gradient(closest-side, rgba(167, 139, 250, 0.20), transparent 72%);
+
+  background-repeat: no-repeat;
+  background-size:
+    85vmax 85vmax,
+    95vmax 95vmax,
+    75vmax 75vmax;
+
+  background-position:
+    25% 40%,
+    72% 55%,
+    45% 85%;
+
+  transform: rotate(-8deg);
+  animation: rainbowCloudsB 18s ease-in-out infinite alternate;
 }
+
+@keyframes rainbowCloudsA {
+  0% {
+    background-position:
+      10% 25%,
+      78% 18%,
+      46% 72%,
+      18% 78%,
+      82% 62%,
+      55% 10%,
+      8% 55%;
+  }
+  50% {
+    background-position:
+      18% 12%,
+      62% 32%,
+      55% 85%,
+      8% 58%,
+      92% 45%,
+      45% 22%,
+      22% 82%;
+  }
+  100% {
+    background-position:
+      30% 35%,
+      84% 40%,
+      38% 60%,
+      22% 90%,
+      70% 78%,
+      62% 18%,
+      6% 30%;
+  }
+}
+
+@keyframes rainbowCloudsB {
+  from {
+    transform: rotate(-10deg) translate3d(-1%, -1%, 0);
+  }
+  to {
+    transform: rotate(-6deg) translate3d(1%, 1%, 0);
+  }
+}
+
+
+
+
+
+
+
 
 button, input { font: inherit; }
 
@@ -51,8 +176,178 @@ button, input { font: inherit; }
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+
+  /* đảm bảo nội dung nằm trên lớp vệt sáng nền */
+  position: relative;
+  z-index: 1;
 }
+
+
+.app-frame {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  flex: 1;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+
+  /* đảm bảo nội dung nằm trên layer nền rainbow-clouds */
+  position: relative;
+  z-index: 1;
+}
+
+
+.sidebar {
+  width: 248px;
+  flex: 0 0 auto;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow: var(--glass-shadow);
+  padding: 14px;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+
+
+.sidebar-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  padding-right: 2px;
+
+  /* Ẩn scrollbar nhưng vẫn cuộn được */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy */
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  display: grid;
+  gap: 10px;
+}
+.sidebar-footer .ghost-btn,
+.sidebar-footer .user-badge,
+.sidebar-footer .sidebar-item {
+  width: 100%;
+}
+
+
+
+.sidebar-item {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+
+.sidebar-icon {
+  width: 22px;
+  text-align: center;
+  opacity: 0.9;
+  font-weight: 800;
+}
+
+.sidebar-label {
+  flex: 1;
+  font-weight: 700;
+}
+
+.sidebar-caret {
+  margin-left: auto;
+  opacity: 0.55;
+  font-weight: 900;
+}
+
+
+.sidebar-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(45, 212, 191, 0.55);
+  box-shadow: 0 14px 30px rgba(10, 20, 34, 0.35);
+  background: rgba(124, 156, 255, 0.16);
+}
+
+body.sidebar-collapsed .sidebar {
+  width: 82px;
+  padding: 14px 10px;
+}
+
+body.sidebar-collapsed .sidebar-label {
+  display: none;
+}
+
+body.sidebar-collapsed .sidebar-caret {
+  display: none;
+}
+
+
+body.sidebar-collapsed .sidebar-toggle,
+body.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+}
+
+body.sidebar-collapsed .sidebar-footer .ghost-btn,
+body.sidebar-collapsed .sidebar-footer .user-badge {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* Không cố định nút "Giới thiệu ứng dụng" trong sidebar */
+.sidebar .sidebar-item[data-nav="aboutApp"] {
+  position: static !important;
+  top: auto !important;
+  bottom: auto !important;
+}
+
+
+
 .topbar {
+
   display: flex; justify-content: space-between; align-items: center; gap: 16px;
   margin-bottom: 24px;
 }
@@ -60,15 +355,26 @@ button, input { font: inherit; }
 .hero-copy { text-align: center; max-width: 760px; }
 .hero-kicker { font-size: 0.82rem; letter-spacing: 0.18em; }
 .hero-header h1 {
-  font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.05; margin-bottom: 0;
+  font-size: clamp(1.6rem, 6vw, 3.6rem);
+  line-height: 1.05;
+  margin-bottom: 0;
+  white-space: nowrap;
   text-shadow: 0 8px 25px rgba(8, 15, 28, 0.45);
 }
+
 .eyebrow { text-transform: uppercase; letter-spacing: 0.25em; font-size: 0.78rem; color: var(--accent-2); }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: clamp(1.8rem, 3vw, 2.6rem); margin-bottom: 0.25rem; }
 h2 { font-size: clamp(1.25rem, 2vw, 1.8rem); margin-bottom: 0.35rem; }
 h3 { font-size: 1.08rem; margin-bottom: 0.3rem; }
 .muted-text, .status-text { color: var(--muted); line-height: 1.5; }
+
+/* Căn đều nội dung phần giới thiệu ứng dụng */
+#appInfoCard .muted-text {
+  text-align: justify;
+  text-justify: inter-word;
+}
+
 .status-text.error { color: #ffd5d5; }
 .status-text.success { color: #d2ffe9; }
 .topbar-actions { display: flex; align-items: center; gap: 12px; }
@@ -89,39 +395,199 @@ h3 { font-size: 1.08rem; margin-bottom: 0.3rem; }
 #quizSection {
   width: min(900px, 100%);
   margin: 0 auto;
+
+  /* Không kéo cao theo viewport: co theo nội dung */
+  height: auto;
+  min-height: unset;
+  align-self: flex-start;
+
+  /* Chừa khoảng trống dưới nút vừa phải (24px-32px) */
+  padding-bottom: 28px;
 }
+
+
+
+
 .panel {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 28px;
-  box-shadow: var(--shadow); padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow: var(--glass-shadow);
+  padding: 22px;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
+
 .auth-panel { min-height: 460px; }
 .intro-card, .hero-card, .history-card, .quiz-card { margin-bottom: 18px; }
+
+.lesson-filter {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-filter select {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: rgba(10, 22, 38, 0.42);
+  color: var(--text);
+  padding: 12px 14px;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+
+.account-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.forgot-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+
+.feedback-form {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.feedback-form textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: rgba(10, 22, 38, 0.42);
+  color: var(--text);
+  padding: 12px 14px;
+  resize: vertical;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+
+.mode-grid { margin-bottom: 1cm; }
+
+/* THI THỬ: căn giữa 2 ô chọn đề + nút bắt đầu (chỉ áp dụng trong card THI THỬ) */
+#examCardHome .mode-grid {
+  justify-content: center;
+  align-items: stretch;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+#examCardHome .mode-card {
+  flex: 0 1 420px;
+}
+
+#examCardHome .mode-card.selected {
+  background: rgba(124, 156, 255, 0.18);
+  border-color: rgba(45, 212, 191, 0.75);
+  box-shadow: 0 14px 30px rgba(10, 20, 34, 0.35);
+}
+
+/* Hàng nút hành động (dùng cho cả LUYỆN TẬP và THI THỬ) */
+.action-button-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+
+#examStartBtn,
+#practiceStartBtn {
+  min-width: 240px;
+}
+
+
+@media (max-width: 640px) {
+  #examCardHome .mode-card {
+    flex: 1 1 280px;
+  }
+}
+
+.leaderboard-card { margin-top: 18px; }
+.dashboard-actions {
+
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.quiz-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .auth-mode-switch, .mode-grid { display: flex; gap: 12px; flex-wrap: wrap; }
 .mode-chip, .mode-card, .ghost-btn, .primary-btn, .option-btn, .panel {
   transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 .mode-chip, .mode-card, .ghost-btn, .primary-btn {
-  border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
-  padding: 10px 14px; cursor: pointer;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 10px 14px;
+  cursor: pointer;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
+
 .mode-chip.active, .mode-card:hover, .ghost-btn:hover, .primary-btn:hover { background: rgba(124, 156, 255, 0.16); }
 .panel:hover, .quiz-card:hover { transform: translateY(-2px); border-color: rgba(45, 212, 191, 0.4); box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28); }
 .mode-card:hover, .option-btn:hover, .ghost-btn:hover, .primary-btn:hover { transform: translateY(-2px); border-color: rgba(45, 212, 191, 0.55); box-shadow: 0 14px 30px rgba(10, 20, 34, 0.35); }
 .hero-header h1:hover { transform: translateY(-2px); color: #95ffe7; text-shadow: 0 0 24px rgba(45, 212, 191, 0.28); }
 .mode-chip { font-weight: 600; }
 .mode-card {
-  flex: 1 1 280px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-  padding: 18px; min-height: 110px; text-align: left;
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  min-height: 110px;
+  text-align: center;
 }
+
 .mode-card strong { font-size: 1.1rem; }
 .mode-card span { color: var(--muted); font-size: 0.95rem; }
 .primary-btn { background: linear-gradient(135deg, var(--accent), #4c63ff); border-color: transparent; font-weight: 700; }
 .ghost-btn { background: rgba(124, 156, 255, 0.08); }
 .auth-form { display: grid; gap: 10px; margin-top: 14px; }
 .auth-form input {
-  width: 100%; border-radius: 14px; border: 1px solid var(--line); background: rgba(10, 20, 34, 0.95);
-  color: var(--text); padding: 12px 14px;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: rgba(10, 22, 38, 0.42);
+  color: var(--text);
+  padding: 12px 14px;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
+
 .section-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
@@ -132,22 +598,58 @@ th { color: var(--muted); font-weight: 600; }
   background: rgba(68, 216, 184, 0.12); border: 1px solid rgba(68, 216, 184, 0.25);
   color: #8df1d6; border-radius: 999px; padding: 10px 14px; font-weight: 800;
 }
-.quiz-card { border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 22px; padding: 18px; background: rgba(7, 17, 29, 0.95); }
+.quiz-status { margin-bottom: 20px; }
+
+.quiz-card {
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(10, 22, 38, 0.42);
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+
 .question-index { color: var(--muted); font-size: 0.95rem; margin-bottom: 6px; }
 .question-text { font-size: 1.1rem; line-height: 1.4; margin-bottom: 14px; }
 .option-list { display: grid; gap: 10px; }
 .option-btn {
-  border: 1px solid rgba(124, 156, 255, 0.22); border-radius: 16px; background: rgba(10, 20, 34, 0.95); color: var(--text);
-  text-align: left; padding: 12px 14px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(10, 22, 38, 0.40);
+  color: var(--text);
+  text-align: left;
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
+
 .option-btn.selected { border-color: var(--accent); background: rgba(124, 156, 255, 0.12); }
-.option-btn.correct { border-color: var(--success); background: rgba(119, 239, 181, 0.12); }
-.option-btn.wrong { border-color: var(--danger); background: rgba(255, 123, 123, 0.12); }
+.option-btn.correct { border-color: var(--success); background: rgba(119, 239, 181, 0.14); }
+.option-btn.wrong { border-color: var(--danger); background: rgba(255, 123, 123, 0.14); }
+
 .option-label { font-weight: 700; color: var(--accent-2); }
 .feedback { margin-top: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(124, 156, 255, 0.12); color: var(--text); }
 .feedback.correct { background: rgba(119, 239, 181, 0.12); color: #c4ffe4; }
 .feedback.wrong { background: rgba(255, 123, 123, 0.12); color: #ffdada; }
-.quiz-actions { display: flex; gap: 10px; margin-top: 14px; }
+.quiz-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: center; }
+
+/* Canh giữa chữ trong nút điều hướng câu hỏi + cùng chiều rộng */
+#prevQuestionBtn,
+#nextQuestionBtn {
+  text-align: center;
+  justify-content: center;
+  flex: 1;
+  max-width: 260px;
+}
+
+
 .about-card { align-self: stretch; }
 .about-list { padding-left: 18px; color: var(--muted); line-height: 1.6; }
 .hidden { display: none; }
@@ -160,6 +662,21 @@ footer {
   font-size: 0.95rem;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
+
+/* Footer phiên bản: căn giữa theo toàn bộ trang/app-shell (không theo cột nội dung bên phải) */
+.app-footer-version {
+  width: 100%;
+  text-align: center;
+  margin-top: 24px;
+  padding-bottom: 24px;
+  padding-top: 0;
+  border-top: none;
+  color: rgba(220, 235, 255, 0.78);
+  font-weight: 600;
+  position: relative;
+  left: 0;
+}
+
 footer a {
   color: #95ffe7;
   text-decoration: none;
@@ -198,15 +715,185 @@ footer a:hover { text-decoration: underline; }
 
 @media (max-width: 768px) {
   .app-shell { width: min(100%, calc(100% - 20px)); padding: 16px 0 24px; }
+  .sidebar { width: 82px; }
+  .sidebar-label { display: none; }
+
+  
+
   .topbar, .quiz-header, .section-header { flex-direction: column; align-items: center; text-align: center; }
   .topbar-actions { width: 100%; justify-content: center; flex-wrap: wrap; }
   .panel, .quiz-card { border-radius: 18px; padding: 16px; }
   .auth-form input, .primary-btn, .ghost-btn, .mode-card, .option-btn { width: 100%; }
   .quiz-actions { flex-direction: column; }
 }
+
+
 @media (max-width: 640px) {
-  .hero-header h1 { font-size: clamp(1.8rem, 12vw, 2.6rem); text-align: center; }
+  .hero-header h1 {
+    font-size: clamp(1.35rem, 9.2vw, 2.4rem);
+    text-align: center;
+    white-space: nowrap;
+  }
   .hero-kicker { font-size: 0.72rem; letter-spacing: 0.18em; }
   .mode-grid { flex-direction: column; }
   th, td { font-size: 0.88rem; padding: 10px 8px; }
+  .dashboard-actions { justify-content: center; }
 }
+
+/* =====================
+   Rainbow clouds layer (DIV)
+   Không còn phụ thuộc body::before/body::after
+   ===================== */
+body::before,
+body::after {
+  content: none !important;
+  display: none !important;
+}
+
+.rainbow-clouds {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+
+  /* rõ và rực hơn */
+  opacity: 0.92;
+  mix-blend-mode: screen;
+  filter: blur(36px) saturate(1.75) brightness(1.08);
+
+  /* scale để blur không bị cắt viền khi inset:0 */
+  transform: scale(1.12);
+  transform-origin: center;
+  will-change: transform, background-position, filter;
+
+
+    background-image:
+    radial-gradient(closest-side, rgba(255, 90, 90, 0.56), transparent 64%),
+    radial-gradient(closest-side, rgba(255, 170, 70, 0.50), transparent 64%),
+    radial-gradient(closest-side, rgba(255, 235, 120, 0.42), transparent 66%),
+    radial-gradient(closest-side, rgba(110, 255, 190, 0.46), transparent 66%),
+    radial-gradient(closest-side, rgba(70, 210, 255, 0.46), transparent 66%),
+    radial-gradient(closest-side, rgba(124, 156, 255, 0.54), transparent 66%),
+    radial-gradient(closest-side, rgba(200, 140, 255, 0.40), transparent 66%);
+
+
+  background-repeat: no-repeat;
+  background-size:
+    70vmax 70vmax,
+    66vmax 66vmax,
+    76vmax 76vmax,
+    72vmax 72vmax,
+    70vmax 70vmax,
+    80vmax 80vmax,
+    64vmax 64vmax;
+
+  background-position:
+    6% 18%,
+    82% 10%,
+    58% 78%,
+    12% 86%,
+    90% 72%,
+    60% 4%,
+    2% 55%;
+
+    animation:
+      rainbowCloudsOrbit 12s linear infinite,
+      rainbowCloudsRotate 22s ease-in-out infinite alternate,
+      rainbowHue 7s linear infinite;
+}
+
+
+@keyframes rainbowCloudsOrbit {
+  0% {
+    background-position:
+      6% 18%,
+      82% 10%,
+      58% 78%,
+      12% 86%,
+      90% 72%,
+      60% 4%,
+      2% 55%;
+  }
+  50% {
+    background-position:
+      25% 6%,
+      96% 44%,
+      36% 92%,
+      6% 64%,
+      78% 90%,
+      44% 20%,
+      14% 30%;
+  }
+  100% {
+    background-position:
+      42% 28%,
+      80% 66%,
+      16% 72%,
+      22% 96%,
+      62% 92%,
+      74% 22%,
+      4% 18%;
+  }
+}
+
+@keyframes rainbowCloudsRotate {
+  from { transform: scale(1.12) rotate(-2.2deg) translate3d(-1.6%, -1.2%, 0); }
+  to { transform: scale(1.12) rotate(2.2deg) translate3d(1.6%, 1.2%, 0); }
+}
+
+@keyframes rainbowHue {
+  from { filter: blur(36px) saturate(1.75) brightness(1.08) hue-rotate(0deg); }
+  to { filter: blur(36px) saturate(1.75) brightness(1.08) hue-rotate(360deg); }
+}
+
+/* =====================
+   Global hover/focus border flow (gradient chạy vòng quanh viền)
+   Không xoay khung/card, chỉ animate background-position
+   ===================== */
+@keyframes borderFlow {
+  0% { background-position: 0 0, 0% 50%; }
+  100% { background-position: 0 0, 300% 50%; }
+}
+
+:where(
+  .panel,
+  .sidebar-item,
+  .mode-card,
+  .option-btn,
+  .ghost-btn,
+  .primary-btn,
+  input,
+  select,
+  textarea
+):not(.correct):not(.wrong):not(:disabled):hover,
+:where(
+  .panel,
+  .sidebar-item,
+  .mode-card,
+  .option-btn,
+  .ghost-btn,
+  .primary-btn,
+  input,
+  select,
+  textarea
+):not(.correct):not(.wrong):not(:disabled):focus-visible,
+:where(input, select, textarea):not(:disabled):focus {
+  border: 2px solid transparent;
+
+  background:
+    linear-gradient(rgba(11, 23, 40, 0.98), rgba(11, 23, 40, 0.98)) padding-box,
+    linear-gradient(90deg, #ff4fd8, #7b61ff, #00d4ff, #38ef7d, #ff4fd8) border-box;
+
+  background-size: 100% 100%, 300% 300%;
+    animation: borderFlow 2.4s linear infinite;
+
+}
+
+
+
+
+
+
+
+
+

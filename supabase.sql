@@ -42,8 +42,12 @@ create policy if not exists "Users can insert their attempts"
   on public.quiz_attempts for insert
   with check (auth.uid() = user_id);
 
--- RPC l?y c�u h?i ng?u nhi�n
-create or replace function public.get_random_questions(p_limit integer)
+-- RPC lấy câu hỏi ngẫu nhiên (có thể lọc theo bài/phần)
+drop function if exists public.get_random_questions(integer);
+create or replace function public.get_random_questions(
+  p_limit integer,
+  p_lesson text default null
+)
 returns table (
   id integer,
   question_text text,
@@ -60,6 +64,94 @@ language sql
 as $$
   select id, question_text, option_a, option_b, option_c, option_d, correct_answer, lesson, level, created_at
   from public.questions
+  where (p_lesson is null or lesson = p_lesson)
   order by random()
-  limit greatest(1, least(coalesce(p_limit, 30), (select count(*) from public.questions)));
+  limit greatest(
+    1,
+    least(
+      coalesce(p_limit, 30),
+      (select count(*) from public.questions q2 where (p_lesson is null or q2.lesson = p_lesson))
+    )
+  );
 $$;
+
+-- RPC: danh sách bài/phần đang có trong bảng questions
+create or replace function public.get_lessons()
+returns table (
+  lesson text,
+  question_count bigint
+)
+language sql
+as $$
+  select lesson, count(*)::bigint as question_count
+  from public.questions
+  where lesson is not null and length(trim(lesson)) > 0
+  group by lesson
+  order by lesson;
+$$;
+
+grant execute on function public.get_lessons() to anon, authenticated;
+
+-- Bảng hồ sơ người dùng (lưu họ tên để hiển thị bảng xếp hạng)
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+
+create policy if not exists "Profiles are readable for authenticated users"
+  on public.profiles for select
+  to authenticated
+  using (true);
+
+create policy if not exists "Users can insert their profile"
+  on public.profiles for insert
+  with check (auth.uid() = user_id);
+
+create policy if not exists "Users can update their profile"
+  on public.profiles for update
+  using (auth.uid() = user_id);
+
+-- RPC: Lấy bảng xếp hạng (top điểm cao nhất).
+-- Dùng SECURITY DEFINER để đọc được toàn bộ quiz_attempts dù table có RLS.
+create or replace function public.get_leaderboard(p_limit integer default 10)
+returns table (
+  rank integer,
+  user_id uuid,
+  full_name text,
+  best_score numeric,
+  attempts bigint
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with agg as (
+    select
+      qa.user_id,
+      coalesce(p.full_name, 'Không tên') as full_name,
+      max(qa.score_percent) as best_score,
+      count(*)::bigint as attempts
+    from public.quiz_attempts qa
+    left join public.profiles p on p.user_id = qa.user_id
+    group by qa.user_id, p.full_name
+  ),
+  ranked as (
+    select
+      row_number() over (order by best_score desc, attempts asc, user_id asc)::int as rank,
+      user_id,
+      full_name,
+      best_score,
+      attempts
+    from agg
+  )
+  select rank, user_id, full_name, best_score, attempts
+  from ranked
+  order by rank
+  limit greatest(1, least(coalesce(p_limit, 10), 100));
+$$;
+
+grant execute on function public.get_leaderboard(integer) to anon, authenticated;
+grant execute on function public.get_random_questions(integer, text) to anon, authenticated;

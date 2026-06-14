@@ -12,41 +12,104 @@
     />
     <link rel="stylesheet" href="./style.css" />
   </head>
-  <body>
-    <div class="app-shell">
-      <header class="topbar hero-header">
-        <div class="hero-copy">
-          <p class="eyebrow hero-kicker">ỨNG DỤNG TRẮC NGHIỆM</p>
-          <h1>ÔN TẬP CHÍNH TRỊ</h1>
-        </div>
-        <div class="topbar-actions">
-          <div id="userBadge" class="user-badge" hidden>
-            <span id="userEmail">user@example.com</span>
+    <body>
+      <div class="app-shell">
+        <header class="topbar hero-header">
+          <div class="hero-copy">
+            <p class="eyebrow hero-kicker">ỨNG DỤNG TRẮC NGHIỆM</p>
+            <h1>ÔN TẬP CHÍNH TRỊ</h1>
           </div>
-          <button id="logoutBtn" class="ghost-btn" hidden>Đăng xuất</button>
-        </div>
-      </header>
+        </header>
 
+        <div class="app-frame">
+                <aside id="sidebar" class="sidebar" aria-label="Thanh tác vụ" hidden>
+          <button id="sidebarToggle" class="sidebar-item sidebar-toggle" type="button" title="Thu gọn/Mở rộng menu">
+            <span class="sidebar-icon">☰</span>
+            <span class="sidebar-label">Thu gọn menu</span>
+            <span class="sidebar-caret" aria-hidden="true">‹</span>
+          </button>
+          <nav class="sidebar-nav" aria-label="Điều hướng">
+                        <button class="sidebar-item" type="button" data-nav="home" title="Trang chủ">
+              <span class="sidebar-icon">⌂</span>
+              <span class="sidebar-label">Trang chủ</span>
+            </button>
+
+
+            <button class="sidebar-item" type="button" data-nav="account" title="Tài khoản">
+              <span class="sidebar-icon">⚙</span>
+              <span class="sidebar-label">Tài khoản</span>
+            </button>
+                        <div id="userBadge" class="sidebar-item" hidden title="Tài khoản">
+              <span class="sidebar-icon">👤</span>
+              <span class="sidebar-label"><span id="userEmail">user@example.com</span></span>
+            </div>
+
+            <button class="sidebar-item" type="button" data-nav="history" title="Lịch sử ôn tập">
+              <span class="sidebar-icon">⏱</span>
+              <span class="sidebar-label">Lịch sử ôn tập</span>
+            </button>
+            <button class="sidebar-item" type="button" data-nav="leaderboard" title="Bảng xếp hạng">
+              <span class="sidebar-icon">★</span>
+              <span class="sidebar-label">Bảng xếp hạng</span>
+            </button>
+            <button class="sidebar-item" type="button" data-nav="author" title="Tác giả">
+              <span class="sidebar-icon">✎</span>
+              <span class="sidebar-label">Tác giả</span>
+            </button>
+            <button class="sidebar-item" type="button" data-nav="feedback" title="Góp ý">
+              <span class="sidebar-icon">✉</span>
+              <span class="sidebar-label">Góp ý</span>
+            </button>
+            <button class="sidebar-item" type="button" data-nav="aboutApp" title="Giới thiệu ứng dụng">
+              <span class="sidebar-icon">ⓘ</span>
+              <span class="sidebar-label">Giới thiệu ứng dụng</span>
+            </button>
+          </nav>
+
+                                        <div class="sidebar-footer">
+            <button id="logoutBtn" class="sidebar-item" type="button" title="Đăng xuất" hidden>
+              <span class="sidebar-icon">⎋</span>
+              <span class="sidebar-label">Đăng xuất</span>
+            </button>
+          </div>
+
+
+        </aside>
+
+                <div class="app-content">
       <main class="main-grid">
-        <section id="authSection" class="panel auth-panel">
+                <section id="authSection" class="panel auth-panel">
           <div class="intro-card">
             <p class="eyebrow">Chào mừng</p>
             <h2>Đăng nhập hoặc tạo tài khoản để bắt đầu</h2>
-            <p class="muted-text">
-              Ứng dụng đọc cấu hình từ Supabase, không hiển thị URL hoặc khóa công khai trong giao diện.
-            </p>
           </div>
+
+
+
 
           <div class="auth-mode-switch" role="tablist" aria-label="Chế độ xác thực">
             <button class="mode-chip active" type="button" data-auth-mode="login">Đăng nhập</button>
             <button class="mode-chip" type="button" data-auth-mode="register">Đăng ký</button>
           </div>
 
-          <form id="authForm" class="auth-form">
+                    <form id="authForm" class="auth-form">
+
+                        <label for="fullNameInput" id="fullNameLabel" hidden>Họ và tên</label>
+                        <input
+                          id="fullNameInput"
+                          type="text"
+                          placeholder="Nhập họ và tên"
+                          autocomplete="name"
+                          hidden
+                        />
+
             <label for="emailInput">Email</label>
             <input id="emailInput" type="email" placeholder="you@example.com" required />
 
+
+            
             <label for="passwordInput">Mật khẩu</label>
+
             <input id="passwordInput" type="password" placeholder="••••••••" required />
 
             <label for="confirmPasswordInput" id="confirmPasswordLabel" hidden>Nhập lại mật khẩu</label>
@@ -58,28 +121,69 @@
           <p id="authMessage" class="status-text" aria-live="polite"></p>
         </section>
 
-        <section id="dashboardSection" class="panel" hidden>
-          <div class="hero-card">
-            <p class="eyebrow">Chọn chế độ luyện tập</p>
-            <h2>Chọn một bộ đề phù hợp với thời gian của bạn</h2>
-            <p class="muted-text">
-              Mỗi lần bắt đầu, hệ thống sẽ lấy câu hỏi ngẫu nhiên từ Supabase bằng RPC.
-            </p>
+                <section id="dashboardSection" class="panel" hidden>
+          <div id="homeView">
+                        <div class="hero-card">
+              <p class="eyebrow">Chọn chế độ luyện tập</p>
+              <h2>Chọn một bộ đề phù hợp với thời gian của bạn</h2>
+              <p class="muted-text">
+                Chọn bài/phần trước khi bắt đầu. Hệ thống sẽ lấy câu hỏi ngẫu nhiên từ Supabase.
+              </p>
+
+              <div class="lesson-filter">
+                <label for="lessonSelect">Bài / Phần</label>
+                <select id="lessonSelect"></select>
+              </div>
+            </div>
+
+
+            <div class="mode-grid">
+              <button class="mode-card" data-mode="30" data-time="20">
+                <strong>30 câu</strong>
+                <span>20 phút</span>
+              </button>
+              <button class="mode-card" data-mode="70" data-time="60">
+                <strong>70 câu</strong>
+                <span>60 phút</span>
+              </button>
+            </div>
           </div>
 
-          <div class="mode-grid">
-            <button class="mode-card" data-mode="30" data-time="20">
-              <strong>30 câu</strong>
-              <span>20 phút</span>
-            </button>
-            <button class="mode-card" data-mode="70" data-time="60">
-              <strong>70 câu</strong>
-              <span>60 phút</span>
-            </button>
+                    <div id="accountView" class="hero-card" hidden>
+            <p class="eyebrow">Tài khoản</p>
+            <h2>Thông tin tài khoản</h2>
+            <ul class="about-list">
+              <li><strong>Họ tên:</strong> <span id="accountName">...</span></li>
+              <li><strong>Email:</strong> <span id="accountEmail">...</span></li>
+            </ul>
+
+            <div class="account-actions">
+              <button id="editNameBtn" class="ghost-btn" type="button">Đổi tên</button>
+            </div>
+
+                        <div id="editNameForm" class="auth-form" hidden>
+              <label for="newNameInput">Họ tên</label>
+              <input id="newNameInput" type="text" placeholder="Nhập họ tên" autocomplete="name" />
+              <div class="inline-actions">
+                <button id="saveNameBtn" class="primary-btn" type="button">Lưu</button>
+                <button id="cancelNameBtn" class="ghost-btn" type="button">Hủy</button>
+              </div>
+            </div>
+
+            <p class="muted-text">Email dùng để đăng nhập. Đăng xuất nằm ở cuối thanh menu.</p>
           </div>
 
-          <section class="history-card">
+
+          <section id="historyCard" class="history-card" hidden>
+            <div class="dashboard-actions">
+              <button id="retryWrongBtn" class="ghost-btn" type="button" hidden>
+                Làm lại câu sai gần nhất
+              </button>
+            </div>
+
+
             <div class="section-header">
+
               <div>
                 <p class="eyebrow">Lịch sử làm bài</p>
                 <h3>Lịch sử của tài khoản hiện tại</h3>
@@ -101,17 +205,50 @@
                 </thead>
                 <tbody id="historyTableBody"></tbody>
               </table>
+                        </div>
+          </section>
+
+                    <section id="leaderboardCard" class="leaderboard-card" hidden>
+
+
+
+            <div class="section-header">
+              <div>
+                <p class="eyebrow">Bảng xếp hạng</p>
+                <h3>Top điểm cao</h3>
+              </div>
+              <button id="refreshLeaderboardBtn" class="ghost-btn" type="button">Làm mới</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hạng</th>
+                    <th>Tên</th>
+                    <th>Điểm cao nhất</th>
+                    <th>Số lượt</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboardTableBody"></tbody>
+              </table>
             </div>
           </section>
         </section>
 
         <section id="quizSection" class="panel" hidden>
+
           <div class="quiz-header">
             <div>
               <p class="eyebrow">Đang làm bài</p>
               <h2 id="quizTitle">Bộ đề</h2>
-            </div>
-            <div class="timer-badge" id="timerBadge">00:00</div>
+                        </div>
+            <div class="quiz-header-actions">
+
+              <button id="pauseBtn" class="ghost-btn" type="button" hidden>Tạm dừng</button>
+              <div class="timer-badge" id="timerBadge">00:00</div>
+          </div>
+
+
           </div>
 
           <div id="quizStatus" class="quiz-status muted-text">Đang chuẩn bị câu hỏi...</div>
@@ -127,20 +264,54 @@
           <h3>Người tạo ứng dụng</h3>
           <ul class="about-list">
             <li>Phạm Nghĩa Trọng</li>
-            <li>Khoa CNTT</li>
-            <li>Trường Cao đẳng Công nghệ Thủ Đức</li>
+            <li>Ngành Truyền Thông & Mạng Máy Tính</li>
+            <li>Khoa Công Nghệ Thông Tin. Trường Cao đẳng Công nghệ Thủ Đức</li>
+            <li>Tôi là người lên ý tưởng giao diện và logic, không trực tiếp viết chương trình này.</li>
           </ul>
-          <p class="muted-text">Ứng dụng dùng Supabase Authentication và RPC để quản lý bài làm.</p>
+          <p class="muted-text">Ứng dụng được dùng Supabase Authentication và RPC để quản lý bài làm.</p>
         </aside>
+              <section id="appInfoCard" class="panel about-card">
+                  <p class="eyebrow">Giới thiệu ứng dụng</p>
+                  <h3>Ôn Tập Chính Trị</h3>
+                  <p class="muted-text">
+                    Ứng dụng Ôn Tập Chính Trị được xây dựng nhằm hỗ trợ sinh viên ôn luyện kiến thức môn Chính trị một cách chủ động, trực quan và hiệu quả.
+                    Ứng dụng cung cấp hệ thống câu hỏi trắc nghiệm theo nhiều chế độ làm bài, giúp người học dễ dàng kiểm tra mức độ hiểu bài, rèn luyện kỹ năng ghi nhớ
+                    và chuẩn bị tốt hơn cho các bài kiểm tra.
+                  </p>
+                  <p class="muted-text">
+                    Người dùng có thể lựa chọn số lượng câu hỏi phù hợp với nhu cầu ôn tập, theo dõi kết quả sau mỗi lượt làm bài, xem lại lịch sử ôn tập và cải thiện điểm số
+                    qua từng lần luyện tập. Bên cạnh đó, bảng xếp hạng giúp tạo thêm động lực học tập, khuyến khích tinh thần cố gắng và cạnh tranh tích cực giữa các người dùng.
+                  </p>
+                                    <p class="muted-text">
+                    Ứng dụng hướng đến sự đơn giản, dễ sử dụng và hiệu quả thực tế, giúp việc ôn tập trở nên nhẹ nhàng hơn nhưng vẫn đảm bảo tính nghiêm túc trong học tập.
+                  </p>
+                  <p class="muted-text"><strong>Phiên bản 2.0</strong> • Cập nhật ngày 14/06/2026</p>
+                </section>
       </main>
 
-      <footer class="app-footer">
-        <p>Đóng góp ý kiến về ứng dụng</p>
-        <p><a href="mailto:tp058235@gmail.com">Mọi góp ý xin gửi về: tp058235@gmail.com</a></p>
+      <footer id="feedbackSection" class="app-footer">
+        <p class="eyebrow">Góp ý</p>
+        <h3>Gửi góp ý về ứng dụng</h3>
+        <div class="feedback-form">
+          <label for="feedbackInput">Nội dung góp ý</label>
+          <textarea id="feedbackInput" rows="5" placeholder="Nhập góp ý của bạn..."></textarea>
+          <button id="sendFeedbackBtn" class="primary-btn" type="button">Gửi góp ý</button>
+          <p class="muted-text">
+            Khi nhấn gửi, hệ thống sẽ mở ứng dụng Email trên thiết bị để gửi trực tiếp cho tác giả.
+            Tiêu đề mặc định: <strong>Góp ý về ứng dụng Chính Trị Cao Đẵng</strong>.
+          </p>
+        </div>
+              </footer>
+
+      <footer id="versionFooter" class="app-footer" aria-label="Phiên bản ứng dụng">
+        <p class="muted-text"><strong>Phiên bản 2.0</strong> • Cập nhật ngày 14/06/2026</p>
       </footer>
 
+        </div>
+      </div>
     </div>
 
     <script type="module" src="./app.js"></script>
+
   </body>
 </html>
