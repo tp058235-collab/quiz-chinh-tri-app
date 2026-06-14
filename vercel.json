@@ -2,6 +2,12 @@
   "rewrites": [
     { "source": "/favicon.ico", "destination": "/public/favicon.png" },
     { "source": "/favicon.png", "destination": "/public/favicon.png" },
-    { "source": "/apple-touch-icon.png", "destination": "/public/favicon.png" }
+
+    { "source": "/icon-192.png", "destination": "/public/favicon.png" },
+    { "source": "/icon-512.png", "destination": "/public/favicon.png" },
+    { "source": "/apple-touch-icon.png", "destination": "/public/favicon.png" },
+
+    { "source": "/manifest.webmanifest", "destination": "/public/manifest.webmanifest" },
+    { "source": "/sw.js", "destination": "/public/sw.js" }
   ]
 }
