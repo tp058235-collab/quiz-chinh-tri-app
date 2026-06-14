@@ -726,9 +726,14 @@ footer a:hover { text-decoration: underline; }
   /* Ẩn sidebar dọc trên mobile, thay bằng mobile-menu ở trên nội dung */
   .sidebar { display: none !important; }
   .app-frame { flex-direction: column; gap: 14px; }
-  .mobile-menu { display: block; }
+    .mobile-menu { display: block; }
   .mobile-menu-toggle { display: flex; align-items: center; gap: 10px; }
   .mobile-menu-panel .sidebar-item { width: 100%; justify-content: flex-start; }
+
+  /* Mobile menu luôn phải hiện chữ, không bị ảnh hưởng bởi trạng thái sidebar-collapsed (chỉ áp dụng cho sidebar desktop) */
+  body.sidebar-collapsed .mobile-menu .sidebar-label { display: inline !important; }
+  body.sidebar-collapsed .mobile-menu .sidebar-caret { display: inline !important; }
+  body.sidebar-collapsed .mobile-menu .sidebar-item { justify-content: flex-start; }
 
   /* Không cuộn ngang, menu chữ đủ rộng */
   html, body { overflow-x: hidden; }
