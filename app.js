@@ -1226,9 +1226,8 @@ announcementCard.innerHTML = `
       word-spacing: normal;
     "
   >
-    ${APP_NAME} đang được nâng cấp giao diện và mở rộng nhiều môn học.
-    Một số tính năng sẽ tiếp tục được tối ưu để quá trình học tập ổn định
-    và thuận tiện hơn.
+    ${APP_NAME} Chúc mọi người học tốt và thi tốt. Nếu phát hiện sai đáp án hay vấn đề gì, các bạn có thể 
+    gửi phản hồi về cho nhà phát triển bằng cách thông qua mail. Xin cảm ơn.
   </p>
 `;
 
