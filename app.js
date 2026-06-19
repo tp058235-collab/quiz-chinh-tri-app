@@ -3,7 +3,7 @@ import { SUPABASE_URL as DEFAULT_SUPABASE_URL, SUPABASE_ANON_KEY as DEFAULT_SUPA
 
 const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {};
 
-const APP_NAME = "Test App"; // New: Global app name
+const APP_NAME = "Quiz App"; // New: Global app name
 const SUPABASE_URL = (env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY || '').trim();
 
@@ -1227,7 +1227,7 @@ announcementCard.innerHTML = `
     "
   >
     ${APP_NAME} Chúc mọi người học tốt và thi tốt. Nếu phát hiện sai đáp án hay vấn đề gì, các bạn có thể 
-    gửi phản hồi về cho nhà phát triển bằng cách thông qua mail. Xin cảm ơn.
+    gửi phản hồi về cho nhà phát triển thông qua email. Xin cảm ơn.
   </p>
 `;
 
