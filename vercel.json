@@ -1,13 +1,56 @@
 {
   "rewrites": [
-    { "source": "/favicon.ico", "destination": "/public/favicon.png" },
-    { "source": "/favicon.png", "destination": "/public/favicon.png" },
-
-    { "source": "/icon-192.png", "destination": "/public/favicon.png" },
-    { "source": "/icon-512.png", "destination": "/public/favicon.png" },
-    { "source": "/apple-touch-icon.png", "destination": "/public/favicon.png" },
-
-    { "source": "/manifest.webmanifest", "destination": "/public/manifest.webmanifest" },
-    { "source": "/sw.js", "destination": "/public/sw.js" }
+    {
+      "source": "/reset-password",
+      "destination": "/reset-password.html"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/favicon.png",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/icon-192.png",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/icon-512.png",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/apple-touch-icon.png",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "destination": "/public/manifest.webmanifest"
+    },
+    {
+      "source": "/sw.js",
+      "destination": "/public/sw.js"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/reset-password.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/reset-password",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    }
   ]
 }

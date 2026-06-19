@@ -387,12 +387,17 @@ async function sendResetEmail() {
   }
 
   try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+        const recoveryUrl = new URL(
+      './reset-password.html',
+      window.location.href
+    ).href;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: recoveryUrl,
     });
     if (error) throw error;
 
-    setStatus('Đã gửi email đặt lại mật khẩu. Có thể kiểm tra email đặt lại mật khẩu trong mục thư rác của bạn nếu không thấy.', 'success');
+    setStatus('Đã gửi email đặt lại mật khẩu. Hãy mở email mới nhất và nhấn liên kết để tạo mật khẩu mới.', 'success');
     cancelForgotPassword();
   } catch (error) {
     console.error(error);
@@ -415,55 +420,136 @@ function showPasswordRecoveryModal() {
 
     <div class="auth-form">
       <label for="recoveryNewPassword">Mật khẩu mới</label>
-      <input id="recoveryNewPassword" type="password" placeholder="••••••••" />
+      <input
+        id="recoveryNewPassword"
+        type="password"
+        placeholder="••••••••"
+        autocomplete="new-password"
+      />
 
       <label for="recoveryConfirmPassword">Nhập lại mật khẩu mới</label>
-      <input id="recoveryConfirmPassword" type="password" placeholder="••••••••" />
+      <input
+        id="recoveryConfirmPassword"
+        type="password"
+        placeholder="••••••••"
+        autocomplete="new-password"
+      />
 
       <div class="inline-actions">
-        <button id="recoverySaveBtn" class="primary-btn" type="button">Lưu mật khẩu</button>
-        <button id="recoveryCancelBtn" class="ghost-btn" type="button">Để sau</button>
+        <button id="recoverySaveBtn" class="primary-btn" type="button">
+          Lưu mật khẩu
+        </button>
+        <button id="recoveryCancelBtn" class="ghost-btn" type="button">
+          Để sau
+        </button>
       </div>
+
+      <p id="recoveryMessage" class="status-text" aria-live="polite"></p>
     </div>
   `;
 
   backdrop.appendChild(card);
   document.body.appendChild(backdrop);
 
+  const saveBtn = card.querySelector('#recoverySaveBtn');
+  const cancelBtn = card.querySelector('#recoveryCancelBtn');
+  const messageEl = card.querySelector('#recoveryMessage');
+  const newPasswordInput = card.querySelector('#recoveryNewPassword');
+  const confirmPasswordInput = card.querySelector('#recoveryConfirmPassword');
+
+  const setRecoveryMessage = (message, variant = 'info') => {
+    if (!messageEl) return;
+    messageEl.textContent = message || '';
+    messageEl.className = `status-text ${variant}`;
+  };
+
+  const cleanRecoveryUrl = () => {
+    window.history.replaceState(
+      {},
+      document.title,
+      window.location.pathname
+    );
+  };
+
   const close = () => {
     backdrop.remove();
   };
 
-  card.querySelector('#recoveryCancelBtn')?.addEventListener('click', close);
+  window.setTimeout(() => {
+    newPasswordInput?.focus();
+  }, 0);
 
-  card.querySelector('#recoverySaveBtn')?.addEventListener('click', async () => {
-    if (configError) {
-      setStatus(configError, 'error');
-      return;
-    }
-
-    const p1 = (card.querySelector('#recoveryNewPassword')?.value || '').trim();
-    const p2 = (card.querySelector('#recoveryConfirmPassword')?.value || '').trim();
-
-    if (p1.length < 6) {
-      setStatus('Mật khẩu tối thiểu 6 ký tự.', 'error');
-      return;
-    }
-    if (p1 !== p2) {
-      setStatus('Mật khẩu nhập lại không khớp.', 'error');
-      return;
-    }
+  cancelBtn?.addEventListener('click', async () => {
+    cancelBtn.disabled = true;
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: p1 });
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.warn('[Password recovery] Không thể đăng xuất phiên khôi phục:', error);
+    }
+
+    cleanRecoveryUrl();
+    close();
+    updateUserUI(null);
+    setView('auth');
+    setStatus(
+      'Bạn chưa đổi mật khẩu. Có thể yêu cầu gửi lại email khi cần.',
+      'info'
+    );
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    if (configError) {
+      setRecoveryMessage(configError, 'error');
+      return;
+    }
+
+    const p1 = (newPasswordInput?.value || '').trim();
+    const p2 = (confirmPasswordInput?.value || '').trim();
+
+    if (p1.length < 6) {
+      setRecoveryMessage('Mật khẩu tối thiểu 6 ký tự.', 'error');
+      newPasswordInput?.focus();
+      return;
+    }
+
+    if (p1 !== p2) {
+      setRecoveryMessage('Mật khẩu nhập lại không khớp.', 'error');
+      confirmPasswordInput?.focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    setRecoveryMessage('Đang cập nhật mật khẩu...', 'info');
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: p1,
+      });
+
       if (error) throw error;
 
+      cleanRecoveryUrl();
+
+      // Chỉ đăng xuất phiên khôi phục trên thiết bị hiện tại.
+      await supabase.auth.signOut({ scope: 'local' });
+
       close();
-      setStatus('Đã đổi mật khẩu.', 'success');
+      updateUserUI(null);
       setView('auth');
+      setStatus(
+        'Đã đổi mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.',
+        'success'
+      );
     } catch (error) {
-      console.error(error);
-      setStatus(error.message || 'Không thể đổi mật khẩu.', 'error');
+      console.error('[Password recovery] Không thể đổi mật khẩu:', error);
+      setRecoveryMessage(
+        error?.message || 'Không thể đổi mật khẩu. Vui lòng yêu cầu email mới.',
+        'error'
+      );
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
     }
   });
 }
@@ -1404,22 +1490,42 @@ async function checkSession() {
   }
 
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
     if (error) throw error;
-        updateUserUI(session);
-        if (session?.user) {
-      await ensureProfileForSession(session);
-      updateRetryWrongButton();
-      await Promise.all([loadHistory(), loadLeaderboard(), loadLessons()]);
-      setView('home');
-    } else {
+
+    updateUserUI(session);
+
+    if (!session?.user) {
       setView('auth');
+      return;
     }
 
+    // Liên kết đặt lại mật khẩu tạo một phiên đăng nhập tạm thời.
+    // Không được đưa người dùng vào trang chủ trước khi họ đặt mật khẩu mới.
+    if (isPasswordRecoveryUrl()) {
+      openPasswordRecovery(session);
+      return;
+    }
 
+    await ensureProfileForSession(session);
+    updateRetryWrongButton();
+    await Promise.all([
+      loadHistory(),
+      loadLeaderboard(),
+      loadLessons(),
+    ]);
+
+    setView('home');
   } catch (error) {
-    console.error(error);
-    setStatus('Không thể kiểm tra phiên đăng nhập. Vui lòng thử lại.', 'error');
+    console.error('[checkSession] Không thể kiểm tra phiên:', error);
+    setStatus(
+      'Không thể kiểm tra phiên đăng nhập. Vui lòng thử lại.',
+      'error'
+    );
   }
 }
 
@@ -2755,6 +2861,30 @@ document.addEventListener('visibilitychange', () => {
 });
 
 
+function isPasswordRecoveryUrl() {
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(
+    window.location.hash.replace(/^#/, '')
+  );
+
+  return (
+    searchParams.get('recovery') === '1' ||
+    hashParams.get('type') === 'recovery'
+  );
+}
+
+function openPasswordRecovery(session) {
+  if (!session?.user) return;
+
+  updateUserUI(session);
+
+  // Không cho app chuyển thẳng vào trang chủ
+  setView('auth');
+
+  window.setTimeout(() => {
+    showPasswordRecoveryModal();
+  }, 0);
+}
 
 (async function init() {
   // Dòng phiên bản: căn giữa theo toàn bộ trang (không theo cột phải)
@@ -2790,8 +2920,59 @@ document.addEventListener('visibilitychange', () => {
 
 
   setAuthMode('login');
-  updateHomeCaret();
-  await checkSession();
+updateHomeCaret();
+
+if (!configError) {
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log('[Auth event]', event);
+
+    const isRecoveryFlow =
+      event === 'PASSWORD_RECOVERY' ||
+      (isPasswordRecoveryUrl() && Boolean(session?.user));
+
+    if (isRecoveryFlow) {
+      openPasswordRecovery(session);
+      return;
+    }
+
+    // Phiên ban đầu đã được checkSession xử lý
+    if (event === 'INITIAL_SESSION') {
+      return;
+    }
+
+    updateUserUI(session);
+
+    if (session?.user) {
+      ensureProfileForSession(session);
+      updateRetryWrongButton();
+
+      Promise.all([
+        loadHistory(),
+        loadLeaderboard(),
+        loadLessons(),
+      ]);
+
+      setView('home');
+    } else {
+      clearQuizState();
+      setView('auth');
+    }
+  });
+}
+
+await checkSession();
+
+/*
+ * Dự phòng trường hợp PASSWORD_RECOVERY xuất hiện
+ * trước khi listener được đăng ký.
+ */
+if (!configError && isPasswordRecoveryUrl()) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  openPasswordRecovery(session);
+}
 
   // Xóa khóa lưu kiểu cũ dùng chung cho mọi môn.
   // Từ phiên bản này, mỗi tài khoản + môn có một khóa riêng.
@@ -2808,33 +2989,7 @@ document.addEventListener('visibilitychange', () => {
   }
 
     
-      let isInitialAuthState = true;
-    supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'PASSWORD_RECOVERY') {
-      updateUserUI(session);
-      showPasswordRecoveryModal();
-      return;
-    }
 
-    if (isInitialAuthState) {
-      isInitialAuthState = false;
-      return;
-    }
-
-
-    updateUserUI(session);
-
-    if (session?.user) {
-            ensureProfileForSession(session);
-      updateRetryWrongButton();
-      Promise.all([loadHistory(), loadLeaderboard(), loadLessons()]);
-      setView('home');
-
-    } else {
-      clearQuizState();
-      setView('auth');
-    }
-  });
 
 })();
 
