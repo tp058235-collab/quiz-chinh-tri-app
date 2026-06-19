@@ -1,0 +1,46 @@
+/* style-auth-state-final-fix.css
+   Put this AFTER all other CSS files. It prevents auth/dashboard from showing together. */
+
+[hidden] {
+  display: none !important;
+}
+
+body.is-guest #sidebar,
+body.is-guest #dashboardSection,
+body.is-guest #quizSection,
+body.is-guest #aboutCard,
+body.is-guest #appInfoCard,
+body.is-guest #historyCard,
+body.is-guest #leaderboardCard,
+body.is-guest #feedbackSection,
+body.is-guest #versionFooter {
+  display: none !important;
+}
+
+body.is-guest #authSection {
+  display: grid !important;
+  visibility: visible !important;
+}
+
+body.is-authenticated #authSection {
+  display: none !important;
+}
+
+body.is-authenticated #sidebar,
+body.is-authenticated #dashboardSection {
+  visibility: visible !important;
+}
+
+/* Make the guest/login page not look like it shares space with the dashboard. */
+body.is-guest .app-frame {
+  display: block !important;
+}
+
+body.is-guest .main-grid {
+  display: block !important;
+}
+
+body.is-guest .auth-panel {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}

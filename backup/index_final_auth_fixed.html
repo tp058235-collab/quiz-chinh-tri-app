@@ -3,15 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>QUIZ APP</title>
+        <title>Test App</title>
 
-        <link rel="icon" type="image/png" href="./public/favicon.png" />
-    <link rel="shortcut icon" href="./public/favicon.png" />
+        <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="shortcut icon" href="/favicon.png" />
 
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#f8fafc" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -20,23 +21,11 @@
     />
     <link rel="stylesheet" href="./style.css" />
     <link rel="stylesheet" href="./style-final-fix.css" />
-    <style>
-      /* Đảm bảo thuộc tính hidden luôn có tác dụng và không bị ghi đè bởi CSS khác */
-      html body [hidden] {
-        display: none !important;
-      }
-    </style>
   </head>
     <body>
       <div class="app-shell">
-         <header class="app-brand-full">
-      <img src="./public/favicon.png" alt="Logo" class="app-brand-logo" />
-      <img src="./public/2.png" alt="Quiz App" class="app-brand-name" />
-    </header>
         <div class="app-frame">
-          <div class="sidebar-column">
                 <aside id="sidebar" class="sidebar" aria-label="Thanh tác vụ" hidden>
-                  
           <button id="sidebarToggle" class="sidebar-item sidebar-toggle" type="button" title="Thu gọn/Mở rộng menu">
             <span class="sidebar-icon">☰</span>
             <span class="sidebar-label">Thu gọn menu</span>
@@ -53,6 +42,11 @@
               <span class="sidebar-icon">⚙</span>
               <span class="sidebar-label">Tài khoản</span>
             </button>
+                        <div id="userBadge" class="sidebar-item" hidden title="Tài khoản">
+              <span class="sidebar-icon">👤</span>
+              <span class="sidebar-label"><span id="userEmail">user@example.com</span></span>
+            </div>
+
             <button class="sidebar-item" type="button" data-nav="history" title="Lịch sử ôn tập">
               <span class="sidebar-icon">⏱</span>
               <span class="sidebar-label">Lịch sử ôn tập</span>
@@ -73,25 +67,19 @@
               <span class="sidebar-icon">ⓘ</span>
               <span class="sidebar-label">Giới thiệu ứng dụng</span>
             </button>
-            <button id="loginNavBtn" class="sidebar-item" type="button" data-nav="auth" title="Đăng nhập">
-              <span class="sidebar-icon">🔑</span>
-              <span class="sidebar-label">Đăng nhập</span>
-            </button>
-            <div id="userBadge" class="sidebar-item" hidden title="Tài khoản">
-              <span class="sidebar-icon">👤</span>
-              <span class="sidebar-label"><span id="userEmail">user@example.com</span></span>
-            </div>
+          </nav>
+
+                                        <div class="sidebar-footer">
             <button id="logoutBtn" class="sidebar-item" type="button" title="Đăng xuất" hidden>
               <span class="sidebar-icon">⎋</span>
               <span class="sidebar-label">Đăng xuất</span>
             </button>
-          </nav>
+          </div>
 
 
         </aside>
-  </div>
+
                 <div class="app-content">
-             
       <main class="main-grid">
                 <section id="authSection" class="panel auth-panel">
           <div class="intro-card">
@@ -159,8 +147,6 @@
                 <button id="cancelNameBtn" class="ghost-btn" type="button">Hủy</button>
               </div>
             </div>
-          </div>
-
 
           <section id="historyCard" class="history-card" hidden>
             <div class="dashboard-actions">
@@ -173,7 +159,8 @@
             <div class="section-header">
 
               <div>
-                <p class="eyebrow">Lịch sử của bạn</p>
+                <p class="eyebrow">Lịch sử làm bài</p>
+                <h3>Lịch sử của tài khoản hiện tại</h3>
               </div>
               <button id="refreshHistoryBtn" class="ghost-btn">Làm mới</button>
             </div>
@@ -202,7 +189,7 @@
             <div class="section-header">
               <div>
                 <p class="eyebrow">Bảng xếp hạng</p>
-                <h3>Top tổng điểm</h3>
+                <h3>Top điểm cao</h3>
               </div>
               <button id="refreshLeaderboardBtn" class="ghost-btn" type="button">Làm mới</button>
             </div>
@@ -212,7 +199,7 @@
                   <tr>
                     <th>Hạng</th>
                     <th>Tên</th>
-                    <th>Tổng điểm</th>
+                    <th>Điểm cao nhất</th>
                     <th>Số lượt</th>
                   </tr>
                 </thead>
@@ -273,29 +260,14 @@
                                     <p class="muted-text">
                     Ứng dụng hướng đến sự đơn giản, dễ sử dụng và hiệu quả thực tế, giúp việc ôn tập trở nên nhẹ nhàng hơn nhưng vẫn đảm bảo tính nghiêm túc trong học tập.
                   </p>
-                  <p class="muted-text"><strong>Phiên bản 3.0</strong> cập nhật ngày 19/06/2026</p>
+                  <p class="muted-text"><strong>Phiên bản 2.5</strong> cập nhật ngày 17/06/2026</p>
                 </section>
 
                 <section class="panel about-card">
                   <p class="eyebrow">Thông tin</p>
                   <h3>Thông tin cập nhật</h3>
-
                   <div class="changelog-list">
                     <details class="changelog-item" open>
-                      <summary><strong>Phiên bản 3.0</strong>&nbsp;- Cập nhật ngày: 19/06/2026</summary>
-                      <div class="changelog-content">
-                        <p><strong>Thông tin đã cập nhật:</strong></p>
-                        <ul class="about-list">
-                          <li>Tối ưu giao diện nhẹ hơn.</li>
-                          <li>Cải thiện trải nghiệm trên điện thoại.</li>
-                          <li>Cải thiện trải nghiệm trên laptop.</li>
-                          <li>Cập nhật thêm môn học.</li>
-                          <li>Nâng cấp trãi nghiệm.</li>
-                        </ul>
-                      </div>
-
-                  <div class="changelog-list">
-                    <details class="changelog-item">
                       <summary><strong>Phiên bản 2.5</strong>&nbsp;- Cập nhật ngày: 17/06/2026</summary>
                       <div class="changelog-content">
                         <p><strong>Thông tin đã cập nhật:</strong></p>
@@ -304,7 +276,6 @@
                           <li>Cải thiện trải nghiệm trên điện thoại.</li>
                         </ul>
                       </div>
-
                     </details>
                     <details class="changelog-item">
                       <summary><strong>Phiên bản 2.0</strong>&nbsp;- Ngày phát hành: 14/06/2026</summary>
@@ -317,7 +288,6 @@
                           <li>Thêm lịch sử ôn tập, bảng xếp hạng.</li>
                         </ul>
                       </div>
-
                     </details>
                     <details class="changelog-item">
                       <summary><strong>Phiên bản 1.0</strong>&nbsp;- Ngày phát hành: 06/06/2026</summary>
@@ -350,8 +320,11 @@
 
         </div>
       </div>
+    </div>
 
     <script type="module" src="./app.js"></script>
+    <script src="./auth-visibility-fix.js"></script>
+    <script src="./ui-final-fix.js"></script>
 
   </body>
 </html>

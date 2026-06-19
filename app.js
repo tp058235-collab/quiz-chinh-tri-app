@@ -2,6 +2,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL as DEFAULT_SUPABASE_URL, SUPABASE_ANON_KEY as DEFAULT_SUPABASE_ANON_KEY } from './config.js';
 
 const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {};
+
+const APP_NAME = "Test App"; // New: Global app name
 const SUPABASE_URL = (env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY || '').trim();
 
@@ -9,21 +11,26 @@ const configError = !SUPABASE_URL || !SUPABASE_ANON_KEY
   ? 'Thiếu biến môi trường VITE_SUPABASE_URL hoặc VITE_SUPABASE_ANON_KEY. Vui lòng cập nhật file config.js hoặc biến môi trường trước khi đăng nhập.'
   : SUPABASE_ANON_KEY.includes('service_role')
     ? 'Khóa Supabase đang dùng là service_role key. Vui lòng dùng VITE_SUPABASE_ANON_KEY (khóa công khai) cho ứng dụng này.'
-    : '';
+    : ''; // Updated message below
 
-const supabase = configError ? null : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const QUIZ_DRAFT_KEY = 'politics_quiz_draft';
-const LAST_WRONG_KEY = 'politics_last_wrong';
-const SIDEBAR_COLLAPSED_KEY = 'politics_sidebar_collapsed';
-
-
+const supabase = configError
+  ? null
+  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+      },
+    });
+const LEGACY_QUIZ_DRAFT_KEY = 'politics_quiz_draft';
+const QUIZ_DRAFT_PREFIX = 'quiz-progress';
 
 
 const elements = {
     sidebar: document.getElementById('sidebar'),
   sidebarToggle: document.getElementById('sidebarToggle'),
   sidebarItems: document.querySelectorAll('.sidebar-item[data-nav]'),
-
 
   authSection: document.getElementById('authSection'),
   dashboardSection: document.getElementById('dashboardSection'),
@@ -98,19 +105,32 @@ const elements = {
     feedbackInput: document.getElementById('feedbackInput'),
   sendFeedbackBtn: document.getElementById('sendFeedbackBtn'),
 
+  // New: Home view cards
+  subjectSelectionCard: null,
+  quizStartCard: null,
+  selectedSubjectTitle: null,
+  changeSubjectBtn: null,
+  confirmSubjectBtn: null,
+  announcementCard: null,
+  reviewCard: null,
+
   // Mobile menu elements (created dynamically)
   mobileMenu: document.getElementById('mobileMenu'),
   mobileMenuToggle: document.getElementById('mobileMenuToggle'),
   mobileMenuPanel: document.getElementById('mobileMenuPanel'),
+  mobileUserBadge: null,
+  mobileUserEmail: null,
+  mobileLogoutBtn: null,
 };
-
-
-
 
 
 let authMode = 'login';
 let currentMode = null;
 let currentView = 'auth';
+let currentUserId = null; // Dùng để tách bài đang làm theo từng tài khoản
+let selectedSubjectSlug = null; // Môn đang được click trên UI
+let confirmedSubjectSlug = null; // Môn đã được xác nhận
+
 
 // Lesson filter state
 let selectedLesson = 'all';
@@ -118,6 +138,19 @@ let questionLessons = [];
 let lessonsLoading = false;
 let lessonsError = '';
 
+// New: Subjects state
+const FALLBACK_SUBJECTS = [
+    { id: 'chinh-tri-id', name: 'Chính Trị', slug: 'chinh-tri' },
+    { id: 'tieng-anh-1-id', name: 'Tiếng Anh 1', slug: 'tieng-anh-1' },
+    { id: 'tieng-anh-2-id', name: 'Tiếng Anh 2', slug: 'tieng-anh-2' },
+    { id: 'phap-luat-id', name: 'Pháp Luật', slug: 'phap-luat' },
+    { id: 'co-so-du-lieu-id', name: 'Cơ Sở Dữ Liệu', slug: 'co-so-du-lieu' },
+    { id: 'ky-nang-mem-id', name: 'Kỹ Năng Mềm', slug: 'ky-nang-mem' },
+];
+let availableSubjects = [];
+
+const LAST_WRONG_KEY = 'politics_last_wrong'; // Keep existing key for compatibility
+const SIDEBAR_COLLAPSED_KEY = 'politics_sidebar_collapsed'; // Keep existing key for compatibility
 
 
 
@@ -151,17 +184,11 @@ function isInteractionLocked() {
   return Boolean(isPaused) && quizMode !== 'practice';
 }
 
-
-
-
-
-function ensureRainbowCloudsBackground() {
-  if (document.querySelector('.rainbow-clouds')) return;
-  const layer = document.createElement('div');
-  layer.className = 'rainbow-clouds';
-  // đặt ngoài cùng, không nằm trong card/sidebar
-  document.body.prepend(layer);
+function isValidUuid(value) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
+
 
 function ensureVersionFooterPlacement() {
   const versionFooter = document.getElementById('versionFooter');
@@ -185,6 +212,9 @@ function ensureVersionFooterPlacement() {
 function setStatus(message, variant = 'info') {
   elements.authMessage.textContent = message || '';
   elements.authMessage.className = `status-text ${variant}`;
+  if (variant === 'error' && elements.authSection && elements.authSection.hidden) {
+    alert(message);
+  }
 }
 
 function setAccountStatus(message, variant = 'info') {
@@ -248,41 +278,86 @@ function ensureAccountPasswordUI() {
   const accountView = elements.accountView;
   if (!accountView) return;
 
-  if (document.getElementById('changePasswordForm')) {
+  if (document.getElementById('changePasswordCard')) {
     elements.accountMessage = document.getElementById('accountMessage');
     return;
   }
 
-  const msg = document.createElement('p');
-  msg.id = 'accountMessage';
-  msg.className = 'status-text';
-  msg.setAttribute('aria-live', 'polite');
-  msg.textContent = '';
+  // Nếu container chưa được cấu hình dạng lưới, ta nhóm nội dung tài khoản lại thành 1 card
+  if (!accountView.dataset.cardified) {
+    accountView.dataset.cardified = 'true';
+    accountView.style.display = 'grid';
+    accountView.style.gap = '22px';
 
-  const form = document.createElement('div');
-  form.id = 'changePasswordForm';
-  form.className = 'auth-form';
-  form.innerHTML = `
-    <label for="newPasswordAccount">Mật khẩu mới</label>
-    <input id="newPasswordAccount" type="password" placeholder="••••••••" />
-
-    <label for="confirmPasswordAccount">Nhập lại mật khẩu mới</label>
-    <input id="confirmPasswordAccount" type="password" placeholder="••••••••" />
-
-    <button id="changePasswordBtn" class="primary-btn" type="button">Đổi mật khẩu</button>
-  `;
-
-  const tailNote = accountView.querySelector('p.muted-text');
-  if (tailNote?.parentNode) {
-    tailNote.parentNode.insertBefore(msg, tailNote);
-    tailNote.parentNode.insertBefore(form, tailNote);
-  } else {
-    accountView.appendChild(msg);
-    accountView.appendChild(form);
+    const profileCard = document.createElement('div');
+    profileCard.className = 'panel dashboard-card';
+    while (accountView.firstChild) {
+      profileCard.appendChild(accountView.firstChild);
+    }
+    accountView.appendChild(profileCard);
   }
 
-  elements.accountMessage = msg;
+  const toggleContainer = document.createElement('div');
+  toggleContainer.style.textAlign = 'center';
+  
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'ghost-btn';
+  toggleBtn.type = 'button';
+  toggleBtn.textContent = 'Đổi mật khẩu';
+  toggleContainer.appendChild(toggleBtn);
+
+  accountView.appendChild(toggleContainer);
+
+  const passCard = document.createElement('div');
+  passCard.id = 'changePasswordCard';
+  passCard.className = 'panel dashboard-card';
+  passCard.hidden = true;
+  passCard.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <h2 style="margin: 0;">Đổi mật khẩu</h2>
+      <button id="cancelChangePasswordBtn" class="ghost-btn" type="button" style="min-height: 32px; padding: 4px 12px;">Đóng</button>
+    </div>
+    <p class="muted-text" style="margin-bottom: 16px;">Tạo mật khẩu mới cho tài khoản của bạn. Mật khẩu tối thiểu 6 ký tự.</p>
+    <p id="accountMessage" class="status-text" aria-live="polite"></p>
+    <div id="changePasswordForm" class="auth-form">
+      <label for="oldPasswordAccount">Mật khẩu cũ</label>
+      <input id="oldPasswordAccount" type="password" placeholder="••••••••" />
+
+      <label for="newPasswordAccount">Mật khẩu mới</label>
+      <input id="newPasswordAccount" type="password" placeholder="••••••••" />
+
+      <label for="confirmPasswordAccount">Nhập lại mật khẩu mới</label>
+      <input id="confirmPasswordAccount" type="password" placeholder="••••••••" />
+
+      <button id="changePasswordBtn" class="primary-btn" type="button">Lưu thay đổi</button>
+    </div>
+  `;
+
+  accountView.appendChild(passCard);
+  elements.accountMessage = passCard.querySelector('#accountMessage');
+
+  toggleBtn.addEventListener('click', () => {
+    toggleContainer.hidden = true;
+    passCard.hidden = false;
+  });
+
+  const cancelBtn = passCard.querySelector('#cancelChangePasswordBtn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      passCard.hidden = true;
+      toggleContainer.hidden = false;
+      const a = document.getElementById('newPasswordAccount');
+      const b = document.getElementById('confirmPasswordAccount');
+      const c = document.getElementById('oldPasswordAccount');
+      if (a) a.value = '';
+      if (b) b.value = '';
+      if (c) c.value = '';
+      if (elements.accountMessage) elements.accountMessage.textContent = '';
+    });
+  }
 }
+
+
 
 function toggleForgotPassword() {
   if (!elements.forgotPasswordForm) return;
@@ -399,9 +474,14 @@ async function changePasswordFromAccount() {
     return;
   }
 
+  const old = (document.getElementById('oldPasswordAccount')?.value || '').trim();
   const p1 = (document.getElementById('newPasswordAccount')?.value || '').trim();
   const p2 = (document.getElementById('confirmPasswordAccount')?.value || '').trim();
 
+  if (!old) {
+    setAccountStatus('Vui lòng nhập mật khẩu cũ.', 'error');
+    return;
+  }
   if (p1.length < 6) {
     setAccountStatus('Mật khẩu tối thiểu 6 ký tự.', 'error');
     return;
@@ -411,15 +491,28 @@ async function changePasswordFromAccount() {
     return;
   }
 
+  setAccountStatus('Đang xác thực...', 'info');
+
   try {
+    // Xác thực mật khẩu cũ bằng cách thử đăng nhập lại với chính email đang dùng
+    const { data: userData } = await supabase.auth.getUser();
+    const email = userData?.user?.email;
+    if (!email) throw new Error('Không tìm thấy thông tin phiên đăng nhập.');
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: old });
+    if (signInError) throw new Error('Mật khẩu cũ không chính xác.');
+
+    // Nếu thành công, tiến hành lưu mật khẩu mới
     const { error } = await supabase.auth.updateUser({ password: p1 });
     if (error) throw error;
 
     setAccountStatus('Đã đổi mật khẩu.', 'success');
     const a = document.getElementById('newPasswordAccount');
     const b = document.getElementById('confirmPasswordAccount');
+    const c = document.getElementById('oldPasswordAccount');
     if (a) a.value = '';
     if (b) b.value = '';
+    if (c) c.value = '';
   } catch (error) {
     console.error(error);
     setAccountStatus(error.message || 'Không thể đổi mật khẩu.', 'error');
@@ -448,7 +541,11 @@ function showSection(sectionName) {
   elements.quizSection.hidden = resolved !== 'quiz';
 
   if (elements.sidebar) {
-    elements.sidebar.hidden = resolved === 'auth';
+    elements.sidebar.hidden = false; // Luôn hiện thanh menu
+  }
+
+  if (elements.mobileMenu) {
+    elements.mobileMenu.hidden = false; // Luôn hiện thanh menu mobile
   }
 
   if (elements.pauseBtn) {
@@ -458,22 +555,27 @@ function showSection(sectionName) {
   if (elements.timerBadge) {
     elements.timerBadge.hidden = resolved !== 'quiz';
   }
+
+  if (elements.mobileMenuToggle) {
+    elements.mobileMenuToggle.hidden = false; // Luôn hiện nút menu
+  }
 }
 
 function setDashboardContainerMode(mode) {
   if (!elements.dashboardSection) return;
 
   const isHome = mode === 'home';
+  const isAccount = mode === 'account';
 
-  if (isHome) {
-    // Home cần tách thành 2 card riêng -> bỏ panel ở container cha
+  if (isHome || isAccount) {
+    // Home và Account cần tách thành các card riêng -> bỏ panel ở container cha
     elements.dashboardSection.classList.remove('panel');
     elements.dashboardSection.style.background = 'transparent';
     elements.dashboardSection.style.border = 'none';
     elements.dashboardSection.style.boxShadow = 'none';
     elements.dashboardSection.style.padding = '0';
   } else {
-    // Các view khác (Tài khoản/Lịch sử/BXH) vẫn dùng panel như cũ
+    // Các view khác (Lịch sử/BXH) vẫn dùng panel như cũ
     elements.dashboardSection.classList.add('panel');
     elements.dashboardSection.style.background = '';
     elements.dashboardSection.style.border = '';
@@ -484,10 +586,24 @@ function setDashboardContainerMode(mode) {
 
 
 function setView(viewKey) {
-  currentView = viewKey;
-
   const isAuthed = !elements.userBadge.hidden;
   const requiresAuth = ['home', 'account', 'history', 'leaderboard'].includes(viewKey);
+
+  let targetView = viewKey;
+  if (requiresAuth && !isAuthed) {
+    targetView = 'auth'; // Chuyển hướng người dùng chưa đăng nhập về màn hình auth
+  }
+
+  currentView = targetView;
+
+  // Update active state in sidebar
+  document.querySelectorAll('.sidebar-item[data-nav]').forEach(item => {
+    item.classList.toggle('active', item.dataset.nav === targetView);
+  });
+  // Also handle user badge for 'account' view
+  if (elements.userBadge) {
+    elements.userBadge.classList.toggle('active', targetView === 'account');
+  }
 
   // reset: hide everything first
   if (elements.homeView) elements.homeView.hidden = true;
@@ -500,24 +616,21 @@ function setView(viewKey) {
 
   if (elements.editNameForm) elements.editNameForm.hidden = true;
 
-  if (requiresAuth && !isAuthed) {
-    showSection('auth');
-    return;
-  }
-
-    switch (viewKey) {
+  switch (targetView) {
     case 'home':
       setDashboardContainerMode('home');
       showSection('dashboard');
       if (elements.homeView) elements.homeView.hidden = false;
-      // Khi vào màn hình chọn chế độ luyện tập, tải danh sách Bài/Phần
-            loadLessons();
+      loadSubjects(); // New: Load subjects for home view
+      if (confirmedSubjectSlug) {
+        loadLessons();
+      }
       syncPausedQuizButtons();
       break;
 
 
     case 'account':
-      setDashboardContainerMode('default');
+      setDashboardContainerMode('account');
       showSection('dashboard');
       if (elements.accountView) elements.accountView.hidden = false;
       break;
@@ -560,8 +673,10 @@ function setView(viewKey) {
 
 
 function setSidebarCollapsed(collapsed) {
-  document.body.classList.toggle('sidebar-collapsed', Boolean(collapsed));
-  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+  if (!elements.sidebar) return;
+  elements.sidebar.classList.toggle('is-collapsed', Boolean(collapsed));
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); // For app.js's getSidebarCollapsed
+  localStorage.setItem('sidebarCollapsed', collapsed ? 'true' : 'false'); // For ui-final-fix.js
   // cập nhật biểu tượng mũi tên
   updateHomeCaret();
 }
@@ -570,8 +685,9 @@ function updateHomeCaret() {
   const caret = document.querySelector('#sidebarToggle .sidebar-caret');
   const label = document.querySelector('#sidebarToggle .sidebar-label');
   const toggle = document.getElementById('sidebarToggle');
+  if (!elements.sidebar) return;
 
-  const collapsed = document.body.classList.contains('sidebar-collapsed');
+  const collapsed = elements.sidebar.classList.contains('is-collapsed');
 
   // Khi sidebar đang mở: caret hướng vào trong (‹) để gợi ý "thu gọn".
   // Khi sidebar đang thu gọn: caret hướng ra ngoài (›) để gợi ý "mở rộng".
@@ -656,13 +772,24 @@ function setAuthMode(mode) {
 
 function updateUserUI(session) {
   const user = session?.user;
+  currentUserId = user?.id || null;
+
   if (user) {
     elements.userBadge.hidden = false;
+    if (elements.mobileUserBadge) elements.mobileUserBadge.hidden = false;
     elements.userEmail.textContent = 'Đang tải...';
+    if (elements.mobileUserEmail) elements.mobileUserEmail.textContent = 'Đang tải...';
     elements.logoutBtn.hidden = false;
+    if (elements.mobileLogoutBtn) elements.mobileLogoutBtn.hidden = false;
+
+    document.querySelectorAll('.sidebar-item[data-nav="auth"]').forEach(btn => btn.hidden = true);
   } else {
     elements.userBadge.hidden = true;
+    if (elements.mobileUserBadge) elements.mobileUserBadge.hidden = true;
     elements.logoutBtn.hidden = true;
+    if (elements.mobileLogoutBtn) elements.mobileLogoutBtn.hidden = true;
+
+    document.querySelectorAll('.sidebar-item[data-nav="auth"]').forEach(btn => btn.hidden = false);
   }
 }
 
@@ -676,7 +803,7 @@ async function ensureProfileForSession(session) {
     const { data: existing, error } = await supabase
       .from('profiles')
       .select('full_name')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (error) throw error;
@@ -685,6 +812,8 @@ async function ensureProfileForSession(session) {
     const displayName = existingName || user.email || 'Người dùng';
 
     elements.userEmail.textContent = displayName;
+    // New: Update mobile user email
+    if (elements.mobileUserEmail) elements.mobileUserEmail.textContent = displayName;
     if (elements.accountName) elements.accountName.textContent = displayName;
     if (elements.accountEmail) elements.accountEmail.textContent = user.email || '';
 
@@ -696,6 +825,8 @@ async function ensureProfileForSession(session) {
     const fallback = session?.user?.email || 'Người dùng';
     elements.userEmail.textContent = fallback;
     if (elements.accountName) elements.accountName.textContent = fallback;
+    // New: Update mobile user email
+    if (elements.mobileUserEmail) elements.mobileUserEmail.textContent = fallback;
     if (elements.accountEmail) elements.accountEmail.textContent = session?.user?.email || '';
     if (elements.newNameInput) elements.newNameInput.value = '';
   }
@@ -719,7 +850,7 @@ async function loadLessons() {
       return;
     }
 
-    const { data, error } = await supabase.rpc('get_question_lessons');
+    const { data, error } = await supabase.rpc('get_lessons', { p_subject_slug: confirmedSubjectSlug }); // Updated RPC call
     if (error) {
       console.error('[loadLessons] rpc error:', {
         message: error.message,
@@ -785,8 +916,10 @@ function ensureMobileMenuUI() {
   const content = document.querySelector('.app-content');
   if (!frame || !content) return;
 
+  
+
   // Create once
-  if (document.getElementById('mobileMenu')) {
+  if (elements.mobileMenu) { // Check elements.mobileMenu instead of document.getElementById
     elements.mobileMenu = document.getElementById('mobileMenu');
     elements.mobileMenuToggle = document.getElementById('mobileMenuToggle');
     elements.mobileMenuPanel = document.getElementById('mobileMenuPanel');
@@ -800,16 +933,29 @@ function ensureMobileMenuUI() {
   const toggle = document.createElement('button');
   toggle.id = 'mobileMenuToggle';
   toggle.className = 'mobile-menu-toggle sidebar-item';
-  toggle.type = 'button';
+  toggle.type = 'button'; // New: Ensure button type
   toggle.innerHTML = '<span class="sidebar-icon">☰</span><span class="sidebar-label">Menu</span><span class="sidebar-caret" aria-hidden="true">▼</span>';
 
   const panel = document.createElement('div');
   panel.id = 'mobileMenuPanel';
   panel.className = 'mobile-menu-panel';
 
-  // Build items based on existing sidebar items, filter out account (đã gộp với user)
-  const items = Array.from(document.querySelectorAll('.sidebar-item[data-nav]'))
-    .filter((btn) => btn.dataset.nav !== 'account');
+ const items = Array.from(document.querySelectorAll('.sidebar-item[data-nav]'))
+  .filter((btn) => {
+    const nav = btn.dataset.nav || '';
+    const label = btn.querySelector('.sidebar-label')?.textContent?.trim() || '';
+
+    return (
+      nav &&
+      nav !== 'account' &&
+      nav !== 'auth' &&
+      btn.id !== 'sidebarToggle' &&
+      btn.id !== 'mobileMenuToggle' &&
+      !btn.classList.contains('sidebar-toggle') &&
+      !label.includes('Mở rộng menu') &&
+      !label.includes('Thu gọn menu')
+    );
+  });
 
   items.forEach((src) => {
     const btn = document.createElement('button');
@@ -833,6 +979,53 @@ function ensureMobileMenuUI() {
     panel.appendChild(btn);
   });
 
+  // Add separator and footer items
+  const footerContainer = document.createElement('div');
+  footerContainer.className = 'sidebar-footer'; // Use same class for potential styling
+  footerContainer.style.marginTop = '10px';
+  footerContainer.style.paddingTop = '10px';
+  footerContainer.style.borderTop = '1px solid var(--line)';
+
+  // User badge for mobile
+  const userBadgeMobile = document.createElement('button');
+  userBadgeMobile.className = 'sidebar-item';
+  userBadgeMobile.type = 'button';
+  userBadgeMobile.title = 'Tài khoản';
+  userBadgeMobile.innerHTML = `<span class="sidebar-icon">👤</span><span class="sidebar-label" id="mobileUserEmail"></span>`;
+  userBadgeMobile.hidden = true;
+  userBadgeMobile.addEventListener('click', () => {
+    navigateFromSidebar('account');
+    wrap.classList.remove('open'); // Close menu on nav
+    const caret = toggle.querySelector('.sidebar-caret');
+    if (caret) caret.textContent = '▼';
+  });
+
+  // Logout button for mobile
+  const logoutBtnMobile = document.createElement('button');
+  logoutBtnMobile.className = 'sidebar-item';
+  logoutBtnMobile.type = 'button';
+  logoutBtnMobile.title = 'Đăng xuất';
+  logoutBtnMobile.innerHTML = `<span class="sidebar-icon">⎋</span><span class="sidebar-label">Đăng xuất</span>`;
+  logoutBtnMobile.hidden = true;
+  logoutBtnMobile.addEventListener('click', handleLogout);
+
+  footerContainer.appendChild(userBadgeMobile);
+  footerContainer.appendChild(logoutBtnMobile);
+  panel.appendChild(footerContainer);
+  // Xóa nút thu gọn/mở rộng sidebar desktop nếu bị copy nhầm vào mobile menu
+Array.from(panel.querySelectorAll('.sidebar-item')).forEach((btn) => {
+  const label = btn.querySelector('.sidebar-label')?.textContent?.trim() || '';
+
+  if (
+    btn.id === 'sidebarToggle' ||
+    btn.classList.contains('sidebar-toggle') ||
+    label.includes('Mở rộng menu') ||
+    label.includes('Thu gọn menu')
+  ) {
+    btn.remove();
+  }
+});
+
   toggle.addEventListener('click', () => {
     wrap.classList.toggle('open');
     const caret = toggle.querySelector('.sidebar-caret');
@@ -840,134 +1033,237 @@ function ensureMobileMenuUI() {
   });
 
   wrap.appendChild(toggle);
-  wrap.appendChild(panel);
-  // Insert above app-content so it sits on top of content column
-  frame.insertBefore(wrap, content);
+  wrap.appendChild(panel); // Panel is inside the wrap
+const appShell = document.querySelector('.app-shell');
+const appFrame = document.querySelector('.app-frame');
 
+if (appShell && appFrame) {
+  appShell.insertBefore(wrap, appFrame);
+} else if (appShell) {
+  appShell.prepend(wrap);
+}
   elements.mobileMenu = wrap;
   elements.mobileMenuToggle = toggle;
   elements.mobileMenuPanel = panel;
+  elements.mobileUserBadge = userBadgeMobile;
+  elements.mobileUserEmail = userBadgeMobile.querySelector('#mobileUserEmail');
+  elements.mobileLogoutBtn = logoutBtnMobile;
 }
 
 function setupHomeViewLayout() {
-
   if (!elements.homeView) return;
 
-  // Tách LUYỆN TẬP và THI THỬ thành 2 card riêng, có khoảng cách rõ ràng
-  elements.homeView.style.display = 'grid';
-  elements.homeView.style.gap = '18px';
-  elements.homeView.style.alignItems = 'start';
+  elements.homeView.innerHTML = ''; // Clear existing content
+  elements.homeView.className = 'home-content-grid'; // Apply grid for home view
 
-  const existingLessonSelect = document.getElementById('lessonSelect');
-  const lessonSelect = existingLessonSelect || document.createElement('select');
-  lessonSelect.id = 'lessonSelect';
-
-    const practiceCard = document.createElement('div');
-  // panel để mỗi phần là 1 "khung" riêng
-  practiceCard.className = 'panel hero-card';
-  practiceCard.innerHTML = `
-    <p class="eyebrow">LUYỆN TẬP</p>
-    <h2>Luyện tập theo bài/phần</h2>
-    <p class="muted-text">Chọn bài hoặc phần muốn ôn tập. Hệ thống sẽ lấy câu hỏi ngẫu nhiên theo nội dung đã chọn.</p>
-  `;
-
-
-    const lessonFilter = document.createElement('div');
-    lessonFilter.className = 'lesson-filter';
-
-    const lessonLabel = document.createElement('label');
-    lessonLabel.htmlFor = 'lessonSelect';
-    lessonLabel.textContent = 'Bài / Phần';
-
-    lessonFilter.appendChild(lessonLabel);
-    lessonFilter.appendChild(lessonSelect);
-    practiceCard.appendChild(lessonFilter);
-
-        const practiceStartBtn = document.createElement('button');
-        practiceStartBtn.id = 'practiceStartBtn';
-        practiceStartBtn.className = 'primary-btn';
-        practiceStartBtn.type = 'button';
-        practiceStartBtn.textContent = 'Bắt đầu luyện tập';
-        practiceStartBtn.dataset.originalLabel = practiceStartBtn.textContent;
-
-
-        const practiceContinueBtn = document.createElement('button');
-        practiceContinueBtn.id = 'practiceContinueBtn';
-        practiceContinueBtn.className = 'ghost-btn';
-        practiceContinueBtn.type = 'button';
-        practiceContinueBtn.textContent = 'Tiếp tục';
-        practiceContinueBtn.hidden = true;
-
-        const practiceActionRow = document.createElement('div');
-        practiceActionRow.className = 'action-button-row';
-        practiceActionRow.appendChild(practiceStartBtn);
-        practiceActionRow.appendChild(practiceContinueBtn);
-        practiceCard.appendChild(practiceActionRow);
-
-
-
-        const examCard = document.createElement('div');
-    examCard.id = 'examCardHome';
-    // panel để mỗi phần là 1 "khung" riêng
-    examCard.className = 'panel hero-card';
-    examCard.innerHTML = `
-      <p class="eyebrow">THI THỬ</p>
-      <h2>Chọn đề thi thử</h2>
-      <p class="muted-text">Làm bài theo thời gian giới hạn để kiểm tra mức độ sẵn sàng.</p>
-      <div class="mode-grid">
-        <button class="mode-card" data-mode="30" data-time="20" type="button">
-          <strong>30 câu</strong>
-          <span>20 phút</span>
-        </button>
-        <button class="mode-card" data-mode="70" data-time="60" type="button">
-          <strong>70 câu</strong>
-          <span>60 phút</span>
-        </button>
+  // Subject Selection Card (main content)
+  const subjectSelectionCard = document.createElement('div');
+  subjectSelectionCard.className = 'panel hero-card';
+  subjectSelectionCard.innerHTML = `
+      <h2 class="subject-page-title">Môn học</h2>
+      <p class="muted-text">Chọn môn học bạn muốn ôn tập hoặc thi thử.</p>
+      <div class="subject-grid-final"></div>
+      <div class="action-button-row">
+          <button id="confirmSubjectBtn" class="primary-btn" type="button" disabled>Xác nhận chọn môn</button>
       </div>
-    `;
+  `;
+  elements.homeView.appendChild(subjectSelectionCard);
+  elements.subjectSelectionCard = subjectSelectionCard;
+  elements.subjectGrid = subjectSelectionCard.querySelector('.subject-grid-final');
+  elements.confirmSubjectBtn = subjectSelectionCard.querySelector('#confirmSubjectBtn');
 
-        const examStartWrap = document.createElement('div');
-    examStartWrap.className = 'action-button-row';
+  // Quiz Start Card
+  const quizStartCard = document.createElement('div');
+  quizStartCard.className = 'panel hero-card';
+  quizStartCard.hidden = true; // Ẩn mặc định khi chưa xác nhận môn học
+  quizStartCard.innerHTML = `
+      <div class="section-header" style="margin-bottom: 16px;">
+        <div>
+          <p class="eyebrow">LÀM BÀI</p>
+          <h2 id="selectedSubjectTitle">Bắt đầu ôn tập</h2>
+        </div>
+        <button id="changeSubjectBtn" class="ghost-btn" type="button">Đổi môn</button>
+      </div>
+      <p class="muted-text">Chọn bài/phần và chế độ để bắt đầu.</p>
+      <div class="lesson-filter">
+          <label for="lessonSelect">Bài / Phần</label>
+          <select id="lessonSelect"></select>
+      </div>
+      <div class="action-button-row">
+          <button id="practiceStartBtn" class="primary-btn" type="button">Bắt đầu luyện tập</button>
+          <button id="practiceContinueBtn" class="ghost-btn" type="button" hidden>Tiếp tục</button>
+      </div>
+      <div class="mode-grid-exam">
+          <button class="mode-card" data-mode="30" data-time="20" type="button">
+              <strong>30 câu</strong>
+              <span>20 phút</span>
+          </button>
+          <button class="mode-card" data-mode="70" data-time="60" type="button">
+              <strong>70 câu</strong>
+              <span>60 phút</span>
+          </button>
+      </div>
+      <div class="action-button-row">
+          <button id="examStartBtn" class="primary-btn" type="button">Bắt đầu thi thử</button>
+          <button id="examContinueBtn" class="ghost-btn" type="button" hidden>Tiếp tục</button>
+      </div>
+  `;
+  elements.homeView.appendChild(quizStartCard);
+  elements.quizStartCard = quizStartCard;
+  elements.selectedSubjectTitle = quizStartCard.querySelector('#selectedSubjectTitle');
+  elements.changeSubjectBtn = quizStartCard.querySelector('#changeSubjectBtn');
+  elements.lessonSelect = quizStartCard.querySelector('#lessonSelect');
+  elements.practiceStartBtn = quizStartCard.querySelector('#practiceStartBtn');
+  elements.practiceContinueBtn = quizStartCard.querySelector('#practiceContinueBtn');
+  elements.modeCards = quizStartCard.querySelectorAll('.mode-card'); // These are for exam modes
+  elements.examStartBtn = quizStartCard.querySelector('#examStartBtn');
+  elements.examContinueBtn = quizStartCard.querySelector('#examContinueBtn');
 
-        const examStartBtn = document.createElement('button');
-    examStartBtn.id = 'examStartBtn';
-    examStartBtn.className = 'primary-btn';
-    examStartBtn.type = 'button';
-    examStartBtn.textContent = 'Bắt đầu thi thử';
-    examStartBtn.dataset.originalLabel = examStartBtn.textContent;
+
+ 
+// Announcement Card
+const announcementCard = document.createElement('div');
+announcementCard.className = 'panel info-card announcement-card';
+
+announcementCard.innerHTML = `
+  <h2>Thông báo từ nhà phát triển</h2>
+
+  <p
+    class="muted-text"
+    style="
+      display: block;
+      width: 100%;
+      margin: 0;
+      text-align: justify;
+      text-align-last: left;
+      line-height: 1.7;
+      word-spacing: normal;
+    "
+  >
+    ${APP_NAME} đang được nâng cấp giao diện và mở rộng nhiều môn học.
+    Một số tính năng sẽ tiếp tục được tối ưu để quá trình học tập ổn định
+    và thuận tiện hơn.
+  </p>
+`;
+
+elements.homeView.appendChild(announcementCard);
+elements.announcementCard = announcementCard;
 
 
-    const examContinueBtn = document.createElement('button');
-    examContinueBtn.id = 'examContinueBtn';
-    examContinueBtn.className = 'ghost-btn';
-    examContinueBtn.type = 'button';
-    examContinueBtn.textContent = 'Tiếp tục';
-    examContinueBtn.hidden = true;
 
-    examStartWrap.appendChild(examStartBtn);
-    examStartWrap.appendChild(examContinueBtn);
-    examCard.appendChild(examStartWrap);
+  // Review Card
+const reviewCard = document.createElement('div');
+reviewCard.className = 'panel info-card review-section';
 
+reviewCard.innerHTML = `
+  <h2>Đánh giá từ người học</h2>
 
+  <div class="review-grid">
+    <article class="review-item">
+      <p class="review-content">
+        “Giao diện dễ nhìn, thao tác chọn môn nhanh và thuận tiện.”
+      </p>
+      <p class="review-student">
+        Sinh viên đến từ Khoa Công nghệ Thông tin
+      </p>
+    </article>
 
+    <article class="review-item">
+      <p class="review-content">
+        “Ứng dụng phù hợp để ôn tập và kiểm tra kiến thức trước kỳ thi.”
+      </p>
+      <p class="review-student">
+        Sinh viên đến từ Khoa Điện – Điện tử
+      </p>
+    </article>
 
-    elements.homeView.innerHTML = '';
-    elements.homeView.appendChild(practiceCard);
-    elements.homeView.appendChild(examCard);
+    <article class="review-item">
+      <p class="review-content">
+        “Mong ứng dụng tiếp tục bổ sung thêm nhiều môn học trong thời gian tới.”
+      </p>
+      <p class="review-student">
+        Sinh viên đến từ Khoa Kinh tế
+      </p>
+    </article>
+  </div>
+`;
 
-    // refresh references after rebuilding DOM
-        elements.lessonSelect = lessonSelect;
-        elements.modeCards = examCard.querySelectorAll('.mode-card');
-        elements.examStartBtn = examStartBtn;
-        elements.practiceStartBtn = practiceStartBtn;
-        elements.practiceContinueBtn = practiceContinueBtn;
-        elements.examContinueBtn = examContinueBtn;
+elements.homeView.appendChild(reviewCard);
+elements.reviewCard = reviewCard;
+  loadSubjects(); // Load and render subjects
+  syncPausedQuizButtons(); // Update continue buttons
+}
 
-        // cập nhật trạng thái hiển thị nút "Tiếp tục" theo draft hiện tại
-        syncPausedQuizButtons();
+// New: Load subjects from Supabase
+async function loadSubjects() {
+    if (configError) {
+        availableSubjects = FALLBACK_SUBJECTS;
+        renderSubjectCards();
+        updateHomeCardsVisibility();
+        return;
+    }
+    try {
+        const { data, error } = await supabase.rpc('get_subjects');
+        if (error) {
+            console.error('Error fetching subjects:', error);
+            availableSubjects = FALLBACK_SUBJECTS;
+        } else {
+            availableSubjects = data.length > 0 ? data : FALLBACK_SUBJECTS;
+        }
+    } catch (e) {
+        console.error('Unexpected error fetching subjects:', e);
+        availableSubjects = FALLBACK_SUBJECTS;
+    }
+    renderSubjectCards();
+    updateHomeCardsVisibility();
+}
+
+// New: Render subject cards
+function renderSubjectCards() {
+    if (!elements.subjectGrid) return;
+    elements.subjectGrid.innerHTML = ''; // Clear existing cards
+
+    availableSubjects.forEach(subject => {
+        const card = document.createElement('button');
+        card.className = `subject-card-final ${subject.slug === selectedSubjectSlug ? 'active is-selected' : ''}`;
+        card.type = 'button';
+        card.dataset.slug = subject.slug;
+        card.innerHTML = `
+            <span class="subject-name-final">${subject.name}</span>
+        `;
+        card.addEventListener('click', () => {
+            selectedSubjectSlug = subject.slug;
+            localStorage.setItem('selectedSubjectSlug', selectedSubjectSlug);
+            renderSubjectCards(); // Re-render to update selection
+            if (elements.confirmSubjectBtn) elements.confirmSubjectBtn.disabled = false;
+            loadLessons(); // Reload lessons for the new subject
+            setStatus(`Đã chọn môn: ${subject.name}`, 'info');
+        });
+        elements.subjectGrid.appendChild(card);
+    });
+}
+
+function updateHomeCardsVisibility() {
+  if (elements.subjectSelectionCard) {
+    elements.subjectSelectionCard.hidden = Boolean(confirmedSubjectSlug);
+  }
+  if (elements.quizStartCard) {
+    elements.quizStartCard.hidden = !confirmedSubjectSlug;
+  }
+  if (elements.announcementCard) {
+    elements.announcementCard.hidden = Boolean(confirmedSubjectSlug);
+  }
+  if (elements.reviewCard) {
+    elements.reviewCard.hidden = Boolean(confirmedSubjectSlug);
   }
 
-
+  if (confirmedSubjectSlug && elements.selectedSubjectTitle) {
+    const subject = availableSubjects.find(s => s.slug === confirmedSubjectSlug);
+    if (subject) {
+      elements.selectedSubjectTitle.textContent = `Ôn tập: ${subject.name}`;
+    }
+  }
+}
 
 
   async function saveNewName() {
@@ -993,12 +1289,12 @@ function setupHomeViewLayout() {
     const user = userData.user;
     console.log('[saveNewName] current user id:', user.id);
 
-    const payload = { id: user.id, full_name: fullName, updated_at: new Date().toISOString() };
+    const payload = { id: user.id, user_id: user.id, full_name: fullName };
     console.log('[saveNewName] payload:', payload);
 
     const { data, error } = await supabase
       .from('profiles')
-      .upsert(payload, { onConflict: 'id' })
+      .upsert(payload, { onConflict: 'user_id' })
       .select()
       .single();
 
@@ -1008,6 +1304,7 @@ function setupHomeViewLayout() {
         code: error.code,
         details: error.details,
         hint: error.hint,
+        payloadDataSent: payload,
       });
       setStatus('Không thể lưu họ tên: ' + (error.message || 'Lỗi không xác định'), 'error');
       return;
@@ -1019,6 +1316,8 @@ function setupHomeViewLayout() {
     // Cập nhật UI ngay, không cần reload
     if (elements.accountName) elements.accountName.textContent = newName || user.email || '';
     elements.userEmail.textContent = newName || user.email || '';
+    // New: Update mobile user email
+    if (elements.mobileUserEmail) elements.mobileUserEmail.textContent = newName || user.email || '';
 
     if (elements.editNameForm) elements.editNameForm.hidden = true;
     if (elements.editNameBtn) elements.editNameBtn.textContent = 'Đổi tên';
@@ -1037,8 +1336,6 @@ function setupHomeViewLayout() {
     setStatus(error?.message || 'Không thể đổi tên.', 'error');
   }
 }
-
-
 
 
 function openEditName() {
@@ -1064,25 +1361,40 @@ function cancelEditName() {
 
 
 function sendFeedbackEmail() {
-    const content = elements.feedbackInput?.value?.trim() || '';
+  const content = elements.feedbackInput?.value?.trim() || '';
+
   if (!content) {
-    setStatus('Vui lòng nhập nội dung góp ý.', 'error');
+    alert('Vui lòng nhập nội dung góp ý.');
     elements.feedbackInput?.focus();
     return;
   }
 
+  const to = 'tp058235@gmail.com';
+  const subject = 'Góp ý về ứng dụng Test App';
 
-  const subject = 'Góp ý về ứng dụng Chính Trị Cao Đẵng';
   const userLine = !elements.userBadge.hidden
     ? `Tài khoản: ${elements.userEmail.textContent || ''}`
     : 'Tài khoản: (chưa đăng nhập)';
 
   const body = `${userLine}\n\nNội dung góp ý:\n${content}`;
 
-  const mailto = `mailto:tp058235@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
-}
+  // Mở Gmail với email, tiêu đề, nội dung đã điền sẵn
+  const gmailUrl =
+    `https://mail.google.com/mail/?view=cm&fs=1` +
+    `&to=${encodeURIComponent(to)}` +
+    `&su=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
 
+  // Dự phòng nếu trình duyệt chặn mở tab mới
+  const mailtoUrl =
+    `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  const newWindow = window.open(gmailUrl, '_blank');
+
+  if (!newWindow) {
+    window.location.href = mailtoUrl;
+  }
+}
 
 
 async function checkSession() {
@@ -1184,7 +1496,14 @@ async function handleAuthSubmit(event) {
     }
   } catch (error) {
     console.error(error);
-    setStatus(error.message || 'Đăng nhập hoặc đăng ký thất bại.', 'error');
+    let errorMsg = error.message || 'Đăng nhập hoặc đăng ký thất bại.';
+    if (error.message === 'Invalid login credentials' || error.status === 400) {
+      errorMsg = 'Email hoặc mật khẩu không chính xác.';
+    }
+    if (error.message === 'Email not confirmed') {
+      errorMsg = 'Email chưa được xác nhận. Vui lòng kiểm tra hộp thư đến (hoặc thư rác) để xác nhận tài khoản.';
+    }
+    setStatus(errorMsg, 'error');
   } finally {
     elements.authSubmitBtn.disabled = false;
   }
@@ -1226,45 +1545,87 @@ function clearQuizState() {
   totalDurationSeconds = 0;
   isPaused = false;
   stopTimer();
-  localStorage.removeItem(QUIZ_DRAFT_KEY);
+
+  // Không xóa bài tạm ở đây. Bài tạm đã được tách theo tài khoản + môn,
+  // nên đăng xuất hoặc đổi màn hình không làm mất bài của môn khác.
 }
 
+function getDraftStorageKey(
+  subjectSlug = confirmedSubjectSlug,
+  userId = currentUserId
+) {
+  const safeUserId = String(userId || '').trim();
+  const safeSubjectSlug = String(subjectSlug || '').trim();
 
+  if (!safeUserId || !safeSubjectSlug) return null;
+  return `${QUIZ_DRAFT_PREFIX}:${safeUserId}:${safeSubjectSlug}`;
+}
 
 function saveDraft() {
-    const draft = {
-      questions,
-      currentQuestionIndex,
-      answers: selectedAnswers,
-      startedAt: quizStartTime,
-      remainingSeconds: totalDurationSeconds,
-      totalQuestions: questionCount,
-      durationMinutes,
-      paused: Boolean(isPaused),
-      quizMode,
-      selectedLesson,
-      quizStarted: Boolean(questions.length),
-    };
-  localStorage.setItem(QUIZ_DRAFT_KEY, JSON.stringify(draft));
+  const subjectSlug = String(confirmedSubjectSlug || '').trim();
+  const storageKey = getDraftStorageKey(subjectSlug, currentUserId);
+
+  // Chỉ lưu khi đã đăng nhập và đã xác nhận đúng môn.
+  if (!storageKey || !questions.length) return;
+
+  const draft = {
+    user_id: currentUserId,
+    subject_slug: subjectSlug,
+    questions,
+    currentQuestionIndex,
+    answers: selectedAnswers,
+    startedAt: quizStartTime,
+    remainingSeconds: totalDurationSeconds,
+    totalQuestions: questionCount,
+    durationMinutes,
+    paused: Boolean(isPaused),
+    quizMode,
+    selectedLesson,
+    quizStarted: true,
+    savedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(storageKey, JSON.stringify(draft));
 }
 
+function loadDraft(
+  subjectSlug = confirmedSubjectSlug,
+  userId = currentUserId
+) {
+  const storageKey = getDraftStorageKey(subjectSlug, userId);
+  if (!storageKey) return null;
 
-function loadDraft() {
   try {
-    return JSON.parse(localStorage.getItem(QUIZ_DRAFT_KEY) || 'null');
+    const draft = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    if (!draft) return null;
+
+    // Chặn tuyệt đối việc dùng bài của tài khoản hoặc môn khác.
+    if (draft.user_id !== userId) return null;
+    if (draft.subject_slug !== subjectSlug) return null;
+
+    return draft;
   } catch (error) {
+    console.warn('[loadDraft] Dữ liệu bài tạm không hợp lệ:', error);
     return null;
   }
 }
 
-function clearDraft() {
-  localStorage.removeItem(QUIZ_DRAFT_KEY);
+function clearDraft(
+  subjectSlug = confirmedSubjectSlug,
+  userId = currentUserId
+) {
+  const storageKey = getDraftStorageKey(subjectSlug, userId);
+  if (storageKey) localStorage.removeItem(storageKey);
 }
 
-function getPausedQuizDraft() {
-  const draft = loadDraft();
+function getPausedQuizDraft(
+  subjectSlug = confirmedSubjectSlug,
+  userId = currentUserId
+) {
+  const draft = loadDraft(subjectSlug, userId);
   if (!draft?.quizStarted) return null;
   if (!Array.isArray(draft.questions) || !draft.questions.length) return null;
+  if (draft.user_id !== userId || draft.subject_slug !== subjectSlug) return null;
   return draft;
 }
 
@@ -1280,7 +1641,7 @@ function resolveDraftMode(draft) {
 }
 
 function syncPausedQuizButtons() {
-  pausedQuizDraft = getPausedQuizDraft();
+  pausedQuizDraft = getPausedQuizDraft(confirmedSubjectSlug, currentUserId);
   const mode = resolveDraftMode(pausedQuizDraft);
 
   if (elements.practiceContinueBtn) elements.practiceContinueBtn.hidden = true;
@@ -1305,7 +1666,7 @@ function syncPausedQuizButtons() {
 
 
 function confirmDiscardPausedQuizIfAny() {
-  const existing = getPausedQuizDraft();
+  const existing = getPausedQuizDraft(confirmedSubjectSlug, currentUserId);
   if (!existing) return true;
 
     // Không hiện hộp thoại trình duyệt: tự xóa bài cũ khi bắt đầu bài mới
@@ -1318,13 +1679,27 @@ function confirmDiscardPausedQuizIfAny() {
 }
 
 function continuePausedQuiz() {
-    const draft = getPausedQuizDraft();
+  const activeSubjectSlug = String(confirmedSubjectSlug || '').trim();
+  const draft = getPausedQuizDraft(activeSubjectSlug, currentUserId);
+
   if (!draft) {
     syncPausedQuizButtons();
-    setStatus('Không có bài làm tạm dừng để tiếp tục.', 'info');
+    setStatus('Không có bài làm tạm dừng của môn này để tiếp tục.', 'info');
     return;
   }
 
+  if (
+    draft.user_id !== currentUserId ||
+    draft.subject_slug !== activeSubjectSlug
+  ) {
+    syncPausedQuizButtons();
+    setStatus('Bài đang lưu không thuộc môn hiện tại.', 'error');
+    return;
+  }
+
+  // Giữ nguyên đúng môn của bài đang tiếp tục, không tự chuyển sang môn khác.
+  selectedSubjectSlug = draft.subject_slug;
+  confirmedSubjectSlug = draft.subject_slug;
 
   const mode = resolveDraftMode(draft);
   quizMode = mode;
@@ -1499,6 +1874,14 @@ async function startPractice() {
     return;
   }
 
+  if (!confirmedSubjectSlug) {
+      setStatus('Vui lòng chọn môn học trước khi bắt đầu luyện tập.', 'error');
+      isLoading = false;
+      return;
+  }
+
+
+
   if (!confirmDiscardPausedQuizIfAny()) {
     isLoading = false;
     return;
@@ -1527,7 +1910,8 @@ async function startPractice() {
   try {
     const { data, error } = await supabase.rpc('get_random_questions_by_lesson', {
       p_limit: 999,
-      p_lesson: selectedLesson || 'all',
+      p_lesson: selectedLesson || 'all', // Keep existing lesson filter
+      p_subject_slug: confirmedSubjectSlug, // New: Filter by selected subject
     });
 
     if (error) {
@@ -1544,7 +1928,7 @@ async function startPractice() {
     }
 
     if (!Array.isArray(data) || data.length === 0) {
-      loadError = 'Chưa có câu hỏi cho bài/phần này.';
+      loadError = 'Môn học này hiện chưa có câu hỏi. Vui lòng chọn môn khác (như Chính Trị, Cơ Sở Dữ Liệu) hoặc thêm dữ liệu vào Supabase.';
       setStatus(loadError, 'error');
       showSection('dashboard');
       return;
@@ -1586,6 +1970,13 @@ async function startExam(totalQuestions) {
     return;
   }
 
+  if (!confirmedSubjectSlug) {
+      setStatus('Vui lòng chọn môn học trước khi bắt đầu thi thử.', 'error');
+      isLoading = false;
+      return;
+  }
+
+
   if (!confirmDiscardPausedQuizIfAny()) {
     isLoading = false;
     return;
@@ -1618,7 +2009,8 @@ async function startExam(totalQuestions) {
   try {
     const { data, error } = await supabase.rpc('get_random_questions_by_lesson', {
       p_limit: totalQuestions,
-      p_lesson: 'all',
+      p_lesson: 'all', // For exams, usually all lessons
+      p_subject_slug: confirmedSubjectSlug, // New: Filter by selected subject
     });
 
     if (error) {
@@ -1637,7 +2029,7 @@ async function startExam(totalQuestions) {
     }
 
     if (!Array.isArray(data) || data.length === 0) {
-      loadError = 'Chưa có câu hỏi cho bài/phần này.';
+      loadError = 'Môn học này hiện chưa có câu hỏi. Vui lòng chọn môn khác (như Chính Trị, Cơ Sở Dữ Liệu) hoặc thêm dữ liệu vào Supabase.';
       elements.quizStatus.textContent = loadError;
       elements.quizCard.innerHTML = `<p class="muted-text">${loadError}</p>`;
       setStatus(loadError, 'error');
@@ -1689,9 +2081,7 @@ async function startExam(totalQuestions) {
 }
 
 // Backward compatible: keep existing callers (if any)
-async function startQuiz(totalQuestions, _minutes) {
-  return startExam(totalQuestions);
-}
+
 
 function setupQuizNavigationButtons() {
   const actions = document.querySelector('#quizSection .quiz-actions');
@@ -1883,65 +2273,104 @@ async function submitQuiz() {
     return;
   }
 
-    if (!questions.length) return;
-
+  if (!questions.length) return;
+  if (!confirmedSubjectSlug) {
+    setStatus('Không xác định được môn học của bài làm.', 'error');
+    return;
+  }
 
   isPaused = false;
   stopTimer();
 
-
-  const correctCount = selectedAnswers.filter((answer, index) => answer === questions[index]?.correct_answer).length;
-  const wrongCount = questions.length - correctCount;
-  const scorePercent = Math.round((correctCount / questions.length) * 100);
-  const durationSeconds = Math.max(1, Math.floor((Date.now() - quizStartTime) / 1000));
+  const totalQuestions = questions.length;
+  const correctCount = selectedAnswers.filter(
+    (answer, index) => answer === questions[index]?.correct_answer
+  ).length;
+  const wrongCount = totalQuestions - correctCount;
+  const scorePercent = Math.round((correctCount / totalQuestions) * 100);
+  const durationSeconds = Math.max(
+    1,
+    Math.floor((Date.now() - quizStartTime) / 1000)
+  );
 
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (userError || !user) throw new Error('Bạn cần đăng nhập để nộp bài.');
 
-                const payload = {
+    if (userError || !user) {
+      throw new Error('Bạn cần đăng nhập để nộp bài.');
+    }
+
+    const subject = availableSubjects.find(
+      (item) => item.slug === confirmedSubjectSlug
+    );
+
+    const payload = {
       user_id: user.id,
-      mode: quizMode || `${questionCount} câu / ${durationMinutes} phút`,
-      total_questions: questionCount,
+      mode: quizMode || `${totalQuestions} câu / ${durationMinutes} phút`,
+      total_questions: totalQuestions,
       correct_count: correctCount,
       wrong_count: wrongCount,
       score_percent: scorePercent,
+      score_points: correctCount,
       duration_seconds: durationSeconds,
+      subject_slug: confirmedSubjectSlug,
     };
 
-    const { error } = await supabase.from('quiz_attempts').insert(payload);
+    // Chỉ gửi subject_id khi đây là UUID thật lấy từ Supabase.
+    // ID dự phòng như "chinh-tri-id" sẽ làm INSERT thất bại.
+    if (isValidUuid(subject?.id)) {
+      payload.subject_id = subject.id;
+    }
 
-    if (error) throw error;
+    const { error: insertError } = await supabase
+      .from('quiz_attempts')
+      .insert(payload);
+
+    if (insertError) throw insertError;
 
     const wrongIds = questions
-      .filter((q, index) => selectedAnswers[index] !== q?.correct_answer)
-
-      .map((q) => q.id)
+      .filter(
+        (question, index) =>
+          selectedAnswers[index] !== question?.correct_answer
+      )
+      .map((question) => question.id)
       .filter((id) => id !== null && id !== undefined);
 
     saveLastWrong({
       ids: wrongIds,
-      totalQuestions: questionCount,
+      totalQuestions,
       durationMinutes,
+      subjectSlug: confirmedSubjectSlug,
       createdAt: new Date().toISOString(),
     });
 
-    elements.quizStatus.textContent = `Hoàn thành! Bạn đúng ${correctCount}/${questions.length} câu (${scorePercent}%).`;
-        setStatus('Nộp bài thành công. Kết quả đã được lưu.', 'success');
-        clearDraft();
-        pausedQuizDraft = null;
-        syncPausedQuizButtons();
-        quizMode = null;
-              await Promise.all([loadHistory(), loadLeaderboard()]);
-          setView('history');
+    elements.quizStatus.textContent =
+      `Hoàn thành! Bạn đúng ${correctCount}/${totalQuestions} câu (${scorePercent}%).`;
 
+    setStatus('Nộp bài thành công. Kết quả đã được lưu.', 'success');
 
+    clearDraft();
+    pausedQuizDraft = null;
+    syncPausedQuizButtons();
+    quizMode = null;
 
+    // Tải tuần tự để chắc chắn bảng xếp hạng nhận dữ liệu vừa lưu.
+    await loadHistory();
+    await loadLeaderboard();
+    setView('history');
   } catch (error) {
+    console.error('[submitQuiz] Không thể lưu kết quả:', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+    });
 
-    console.error(error);
-    setStatus(error.message || 'Không thể lưu kết quả làm bài.', 'error');
+    setStatus(
+      error?.message || 'Không thể lưu kết quả làm bài.',
+      'error'
+    );
   }
 }
 
@@ -2026,57 +2455,79 @@ async function loadLeaderboard() {
   if (!elements.leaderboardTableBody) return;
 
   if (configError) {
-    elements.leaderboardTableBody.innerHTML = '<tr><td colspan="4">Cấu hình Supabase chưa hợp lệ.</td></tr>';
+    elements.leaderboardTableBody.innerHTML =
+      '<tr><td colspan="4">Cấu hình Supabase chưa hợp lệ.</td></tr>';
     return;
   }
 
   try {
     const { data: sessionData } = await supabase.auth.getSession();
+
     if (!sessionData?.session?.user) {
-      elements.leaderboardTableBody.innerHTML = '<tr><td colspan="4">Bạn cần đăng nhập để xem bảng xếp hạng.</td></tr>';
+      elements.leaderboardTableBody.innerHTML =
+        '<tr><td colspan="4">Bạn cần đăng nhập để xem bảng xếp hạng.</td></tr>';
       return;
     }
 
-    const { data, error } = await supabase.rpc('get_leaderboard', { p_limit: 10 });
+    const subjectSlug =
+      confirmedSubjectSlug || selectedSubjectSlug || null;
+
+    const { data, error } = await supabase.rpc('get_leaderboard', {
+      p_limit: 50,
+      p_subject_slug: subjectSlug,
+    });
+
     if (error) {
-      console.error('[loadLeaderboard] rpc error:', {
+      console.error('[loadLeaderboard] RPC error:', {
         message: error.message,
         code: error.code,
         details: error.details,
         hint: error.hint,
       });
-      elements.leaderboardTableBody.innerHTML = `<tr><td colspan="4">Không thể tải bảng xếp hạng: ${error.message || 'Lỗi không xác định'}</td></tr>`;
+
+      elements.leaderboardTableBody.innerHTML =
+        `<tr><td colspan="4">Không thể tải bảng xếp hạng: ${
+          error.message || 'Lỗi không xác định'
+        }</td></tr>`;
       return;
     }
 
     if (!Array.isArray(data) || data.length === 0) {
       leaderboardData = [];
-      elements.leaderboardTableBody.innerHTML = '<tr><td colspan="4">Chưa có dữ liệu xếp hạng.</td></tr>';
+      elements.leaderboardTableBody.innerHTML =
+        '<tr><td colspan="4">Chưa có dữ liệu xếp hạng.</td></tr>';
       return;
     }
 
     leaderboardData = data;
     elements.leaderboardTableBody.innerHTML = data
-      .map((item) => {
+      .map((item, index) => {
         const score = Number(item.best_score);
-        const scoreText = Number.isFinite(score) ? score.toFixed(1) + '%' : '-';
+        const scoreText = Number.isFinite(score)
+          ? `${Math.round(score)} điểm`
+          : '-';
+
         return `
           <tr>
-            <td>${item.rank}</td>
-            <td>${item.name ?? 'Không tên'}</td>
+            <td>${item.rank ?? index + 1}</td>
+            <td>${item.full_name ?? 'Không tên'}</td>
             <td>${scoreText}</td>
-            <td>${item.attempt_count}</td>
+            <td>${item.attempts ?? 0}</td>
           </tr>`;
       })
       .join('');
   } catch (error) {
-    console.error('[loadLeaderboard] unexpected error:', {
+    console.error('[loadLeaderboard] Unexpected error:', {
       message: error?.message,
       code: error?.code,
       details: error?.details,
       hint: error?.hint,
     });
-    elements.leaderboardTableBody.innerHTML = `<tr><td colspan="4">Không thể tải bảng xếp hạng: ${error?.message || 'Lỗi không xác định'}</td></tr>`;
+
+    elements.leaderboardTableBody.innerHTML =
+      `<tr><td colspan="4">Không thể tải bảng xếp hạng: ${
+        error?.message || 'Lỗi không xác định'
+      }</td></tr>`;
   }
 }
 
@@ -2085,12 +2536,18 @@ async function loadLeaderboard() {
 function wireEvents() {
   // Xóa nút "Tài khoản" khỏi menu chính (chỉ dùng ô user ở cuối sidebar để vào trang Tài khoản)
   const accountNavBtn = document.querySelector('.sidebar-item[data-nav="account"]');
+  // New: If mobile menu toggle is in header, remove it from sidebar
+  if (elements.mobileMenuToggle && elements.mobileMenuToggle.parentNode === elements.sidebar) {
+    elements.mobileMenuToggle.remove();
+  }
+
   if (accountNavBtn) accountNavBtn.remove();
 
   // toggle button to collapse/expand sidebar
   if (elements.sidebarToggle) {
     elements.sidebarToggle.addEventListener('click', () => {
-      const collapsed = document.body.classList.contains('sidebar-collapsed');
+      if (!elements.sidebar) return;
+      const collapsed = elements.sidebar.classList.contains('is-collapsed');
       setSidebarCollapsed(!collapsed);
     });
   }
@@ -2118,8 +2575,6 @@ function wireEvents() {
     elements.userBadge.tabIndex = 0;
     elements.userBadge.setAttribute('role', 'button');
   }
-
-
 
 
   elements.modeChips.forEach((chip) => {
@@ -2165,8 +2620,6 @@ function wireEvents() {
     if (elements.practiceContinueBtn) {
       elements.practiceContinueBtn.addEventListener('click', continuePausedQuiz);
     }
-
-
 
 
   if (elements.editNameBtn) {
@@ -2244,6 +2697,40 @@ function wireEvents() {
     });
   }
 
+  if (elements.changeSubjectBtn) {
+    elements.changeSubjectBtn.addEventListener('click', () => {
+      // Chỉ bỏ xác nhận môn trên giao diện; không xóa bài tạm của môn cũ.
+      confirmedSubjectSlug = null;
+      pausedQuizDraft = null;
+      syncPausedQuizButtons();
+      updateHomeCardsVisibility();
+
+      if (elements.confirmSubjectBtn) {
+        elements.confirmSubjectBtn.disabled = !selectedSubjectSlug;
+      }
+    });
+  }
+
+  if (elements.confirmSubjectBtn) {
+    elements.confirmSubjectBtn.addEventListener('click', () => {
+      if (selectedSubjectSlug) {
+        confirmedSubjectSlug = selectedSubjectSlug;
+        selectedLesson = 'all';
+
+        updateHomeCardsVisibility();
+        loadLessons();
+
+        // Chỉ tìm bài tạm đúng tài khoản và đúng môn vừa xác nhận.
+        syncPausedQuizButtons();
+
+        const subject = availableSubjects.find(
+          (item) => item.slug === confirmedSubjectSlug
+        );
+        if (subject) setStatus(`Đã chọn môn: ${subject.name}`, 'info');
+      }
+    });
+  }
+
   if (elements.examContinueBtn) {
     elements.examContinueBtn.addEventListener('click', continuePausedQuiz);
   }
@@ -2268,31 +2755,25 @@ document.addEventListener('visibilitychange', () => {
 });
 
 
-(async function init() {
-    // Nền mây 7 màu (layer riêng)
-  ensureRainbowCloudsBackground();
 
+(async function init() {
   // Dòng phiên bản: căn giữa theo toàn bộ trang (không theo cột phải)
   ensureVersionFooterPlacement();
-
 
   if (configError) {
     setStatus(configError, 'error');
   }
 
-
-    const storedSidebar = getSidebarCollapsed();
-  if (storedSidebar === null) {
-    setSidebarCollapsed(window.matchMedia('(max-width: 768px)').matches);
-  } else {
-    setSidebarCollapsed(storedSidebar);
-  }
+  // Luôn xác định trạng thái thanh bên theo kích thước cửa sổ hiện tại khi tải, không phải giá trị đã lưu.
+  // Điều này ngăn trạng thái "thu gọn" từ phiên di động làm hỏng bố cục trên máy tính để bàn.
+  // Người dùng vẫn có thể chuyển đổi thanh bên theo cách thủ công trong phiên.
+  setSidebarCollapsed(window.matchMedia('(max-width: 768px)').matches);
 
     // mặc định: Trang chủ bị ẩn, chỉ hiện sau khi bấm menu hoặc sau khi đăng nhập
   setView('auth');
 
     // Tách layout Luyện tập / Thi thử (chỉ DOM client-side, không đổi HTML gốc)
-    setupHomeViewLayout();
+  setupHomeViewLayout();
 
     // Mobile menu on small screens
     ensureMobileMenuUI();
@@ -2312,12 +2793,13 @@ document.addEventListener('visibilitychange', () => {
   updateHomeCaret();
   await checkSession();
 
-
-
+  // Xóa khóa lưu kiểu cũ dùng chung cho mọi môn.
+  // Từ phiên bản này, mỗi tài khoản + môn có một khóa riêng.
+  localStorage.removeItem(LEGACY_QUIZ_DRAFT_KEY);
 
     // Nếu có bài làm đang lưu, chỉ hiển thị nút "Tiếp tục" ở màn hình Home.
   // Không tự động nhảy vào màn hình làm bài.
-  pausedQuizDraft = getPausedQuizDraft();
+  pausedQuizDraft = getPausedQuizDraft(confirmedSubjectSlug, currentUserId);
   syncPausedQuizButtons();
 
 
@@ -2356,13 +2838,46 @@ document.addEventListener('visibilitychange', () => {
 
 })();
 
-// Register service worker (PWA)
+// Service Worker chỉ chạy khi đưa web lên hosting.
+// Khi chạy Live Server thì tự gỡ bản cũ để không báo lỗi.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(console.error);
+  window.addEventListener('load', async () => {
+    const isLocalhost =
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === 'localhost';
+
+    if (isLocalhost) {
+      try {
+        const registrations =
+          await navigator.serviceWorker.getRegistrations();
+
+        await Promise.all(
+          registrations.map((registration) =>
+            registration.unregister()
+          )
+        );
+
+        const cacheNames = await caches.keys();
+
+        await Promise.all(
+          cacheNames.map((cacheName) =>
+            caches.delete(cacheName)
+          )
+        );
+
+        console.log('Service Worker đã được tắt trên Live Server.');
+      } catch (error) {
+        console.warn('Không thể dọn Service Worker cũ:', error);
+      }
+
+      return;
+    }
+
+    try {
+      await navigator.serviceWorker.register('./sw.js');
+      console.log('Service Worker đã đăng ký thành công.');
+    } catch (error) {
+      console.error('Không thể đăng ký Service Worker:', error);
+    }
   });
 }
-
-
-
-
