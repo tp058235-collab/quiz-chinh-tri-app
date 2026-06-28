@@ -1,5 +1,5 @@
 /* auth-state-final-fix.js
-   Final guard for Test App visibility.
+   Final guard for Quiz App visibility.
    Purpose: never show auth form and dashboard at the same time.
    Put this AFTER app.js and ui-final-fix.js. */
 (function () {

@@ -1455,7 +1455,7 @@ function sendFeedbackEmail() {
   }
 
   const to = 'tp058235@gmail.com';
-  const subject = 'Góp ý về ứng dụng Test App';
+  const subject = 'Góp ý về ứng dụng Quiz App';
 
   const userLine = !elements.userBadge.hidden
     ? `Tài khoản: ${elements.userEmail.textContent || ''}`
@@ -2317,11 +2317,35 @@ function renderQuestion() {
       }).join('')}
     </div>
     ${answeredState[currentQuestionIndex] ? `
-      <div class="feedback ${selectedAnswers[currentQuestionIndex] === question.correct_answer ? 'correct' : 'wrong'}">
-        ${selectedAnswers[currentQuestionIndex] === question.correct_answer
+  <div class="feedback ${
+    selectedAnswers[currentQuestionIndex] === question.correct_answer
+      ? 'correct'
+      : 'incorrect'
+  }">
+    <div class="feedback-result">
+      ${
+        selectedAnswers[currentQuestionIndex] === question.correct_answer
           ? 'Chính xác! Bạn đã chọn đáp án đúng.'
-          : `Sai rồi. Đáp án đúng là ${question.correct_answer}: ${question['option_' + question.correct_answer.toLowerCase()]}.`}
-      </div>` : ''}
+          : `Sai rồi. Đáp án đúng là ${question.correct_answer}: ${
+              question[
+                'option_' + question.correct_answer.toLowerCase()
+              ]
+            }.`
+      }
+    </div>
+
+    ${
+      question.explanation
+        ? `
+          <div class="answer-explanation">
+            <strong>Giải thích:</strong>
+            <span>${question.explanation}</span>
+          </div>
+        `
+        : ''
+    }
+  </div>
+` : ''}
   `;
 
   const optionButtons = elements.quizCard.querySelectorAll('.option-btn');

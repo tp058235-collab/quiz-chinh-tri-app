@@ -1,6 +1,6 @@
 
 /* style-final-fix.css
-   Final UI override for Test App. Put this file after style.css.
+   Final UI override for Quiz App. Put this file after style.css.
    It fixes: light pastel background, separated subject cards, real sidebar collapse. */
 
 :root {
@@ -1836,4 +1836,20 @@ body:has(#authSection:not([hidden])) .app-shell > header.app-brand-plain {
   body #mobileMenuPanel .sidebar-label {
     font-size: 14px !important;
   }
+}
+.answer-explanation {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  line-height: 1.6;
+}
+
+.answer-explanation strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #facc15;
+}
+
+.answer-explanation span {
+  color: #e5e7eb;
 }

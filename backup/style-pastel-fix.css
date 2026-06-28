@@ -1,4 +1,4 @@
-/* Pastel UI fix for Test App
+/* Pastel UI fix for Quiz App
    Add this file after the existing style.css link. It only overrides UI styles,
    so Supabase/Auth/quiz logic remains unchanged. */
 
