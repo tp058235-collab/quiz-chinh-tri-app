@@ -61,6 +61,10 @@
               <span class="sidebar-icon">★</span>
               <span class="sidebar-label">Bảng xếp hạng</span>
             </button>
+            <button class="sidebar-item" type="button" data-nav="classes" title="Lớp học">
+              <span class="sidebar-icon">🏫</span>
+              <span class="sidebar-label">Lớp học</span>
+            </button>
             <button class="sidebar-item" type="button" data-nav="author" title="Tác giả">
               <span class="sidebar-icon">✎</span>
               <span class="sidebar-label">Tác giả</span>
@@ -220,6 +224,10 @@
               </table>
             </div>
           </section>
+
+          <section id="classCard" class="history-card" hidden>
+            <div id="classContent"></div>
+          </section>
         </section>
 
         <section id="quizSection" class="panel" hidden>
@@ -350,8 +358,9 @@
 
         </div>
       </div>
+      </div>
 
-    <script type="module" src="./app.js?v=20260916-1"></script>
+    <script type="module" src="./app.js?v=20260916-2"></script>
 
   </body>
 </html>

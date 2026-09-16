@@ -88,6 +88,9 @@ const elements = {
   leaderboardTableBody: document.getElementById('leaderboardTableBody'),
   refreshLeaderboardBtn: document.getElementById('refreshLeaderboardBtn'),
 
+  classCard: document.getElementById('classCard'),
+  classContent: document.getElementById('classContent'),
+
   quizTitle: document.getElementById('quizTitle'),
   timerBadge: document.getElementById('timerBadge'),
   pauseBtn: document.getElementById('pauseBtn'),
@@ -689,7 +692,7 @@ function setDashboardContainerMode(mode) {
 
 function setView(viewKey) {
   const isAuthed = !elements.userBadge.hidden;
-  const requiresAuth = ['home', 'account', 'history', 'leaderboard'].includes(viewKey);
+  const requiresAuth = ['home', 'account', 'history', 'leaderboard', 'classes'].includes(viewKey);
 
   let targetView = viewKey;
   if (requiresAuth && !isAuthed) {
@@ -712,6 +715,7 @@ function setView(viewKey) {
   if (elements.accountView) elements.accountView.hidden = true;
   if (elements.historyCard) elements.historyCard.hidden = true;
   if (elements.leaderboardCard) elements.leaderboardCard.hidden = true;
+  if (elements.classCard) elements.classCard.hidden = true;
   if (elements.aboutCard) elements.aboutCard.hidden = true;
   if (elements.appInfoCard) elements.appInfoCard.hidden = true;
   if (elements.feedbackSection) elements.feedbackSection.hidden = true;
@@ -748,6 +752,20 @@ function setView(viewKey) {
       showSection('dashboard');
       if (elements.leaderboardCard) elements.leaderboardCard.hidden = false;
       loadLeaderboard();
+      break;
+    case 'classes':
+      setDashboardContainerMode('default');
+      showSection('dashboard');
+      if (elements.classCard) elements.classCard.hidden = false;
+      // Nếu đã được yêu cầu mở sẵn màn "tham gia lớp" kèm mã mời (từ link
+      // ?join=CODE) thì giữ nguyên, không reset về danh sách lớp.
+      if (classState.screen === 'join' && classState.joinCodePrefill) {
+        renderClassScreen();
+      } else {
+        classState.screen = 'list';
+        classSetMessage('');
+        loadMyClasses();
+      }
       break;
     case 'author':
       setDashboardContainerMode('default');
@@ -833,6 +851,8 @@ function navigateFromSidebar(navKey) {
     scrollToTarget(isAuthed ? elements.historyCard : elements.authSection);
   } else if (navKey === 'leaderboard') {
     scrollToTarget(isAuthed ? elements.leaderboardCard : elements.authSection);
+  } else if (navKey === 'classes') {
+    scrollToTarget(isAuthed ? elements.classCard : elements.authSection);
   } else if (navKey === 'author') {
     scrollToTarget(elements.aboutCard);
   } else if (navKey === 'feedback') {
@@ -2678,6 +2698,947 @@ async function loadLeaderboard() {
 
 
 
+// =============================================================================
+// LỚP HỌC (KIỂM TRA THEO LỚP) - Phase 1 MVP
+// Toàn bộ UI được render động vào elements.classContent, điều hướng nội bộ
+// qua classState.screen. Sự kiện click dùng event delegation (wireClassEvents)
+// gắn 1 lần lên elements.classContent, không cần re-attach sau mỗi lần render.
+// =============================================================================
+
+const classState = {
+  screen: 'list', // list | create | join | detail | members | createQuiz | takeQuiz | review | quizResults
+  classes: [],
+  classId: null,
+  classDetail: null,
+  quizzes: [],
+  quizId: null,
+  members: [],
+  lessonsForQuiz: [],
+  attemptId: null,
+  takeQuizQuestions: [],
+  takeQuizAnswers: {},
+  takeQuizIndex: 0,
+  takeQuizDeadline: null,
+  takeQuizTimerId: null,
+  takeQuizTitle: '',
+  reviewData: [],
+  reviewSummary: null,
+  quizLeaderboard: [],
+  quizLeaderboardTitle: '',
+  joinCodePrefill: '',
+  loading: false,
+  message: '',
+  messageVariant: 'info',
+};
+
+function classSetMessage(message, variant = 'info') {
+  classState.message = message || '';
+  classState.messageVariant = variant;
+}
+
+function classMessageHtml() {
+  if (!classState.message) return '';
+  return `<p class="status-text ${escapeHtml(classState.messageVariant)}" aria-live="polite">${escapeHtml(classState.message)}</p>`;
+}
+
+function formatClassDate(value) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+function classStatusLabel(status) {
+  switch (status) {
+    case 'submitted': return 'Đã nộp';
+    case 'in_progress': return 'Đang làm dở';
+    default: return 'Chưa làm';
+  }
+}
+
+async function renderClassScreen() {
+  if (!elements.classContent) return;
+  switch (classState.screen) {
+    case 'create': return renderClassCreateForm();
+    case 'join': return renderClassJoinForm();
+    case 'detail': return renderClassDetailScreen();
+    case 'members': return renderClassMembersScreen();
+    case 'createQuiz': return renderCreateQuizForm();
+    case 'takeQuiz': return renderTakeQuizScreen();
+    case 'review': return renderReviewScreen();
+    case 'quizResults': return renderQuizLeaderboardScreen();
+    case 'list':
+    default:
+      return renderClassListScreen();
+  }
+}
+
+// ---------- 1. Danh sách lớp -------------------------------------------------
+
+async function loadMyClasses() {
+  if (configError || !currentUserId) return;
+  classState.loading = true;
+  renderClassListScreen();
+  try {
+    const { data, error } = await supabase.rpc('get_my_classes');
+    if (error) throw error;
+    classState.classes = data || [];
+  } catch (err) {
+    classSetMessage(err.message || 'Không tải được danh sách lớp.', 'error');
+    classState.classes = [];
+  } finally {
+    classState.loading = false;
+    renderClassListScreen();
+  }
+}
+
+function renderClassListScreen() {
+  if (!elements.classContent) return;
+  const rows = classState.classes;
+
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Lớp học</p>
+        <h3>Kiểm tra theo lớp</h3>
+      </div>
+      <div class="inline-actions">
+        <button class="ghost-btn" type="button" data-class-action="show-join">Tham gia lớp</button>
+        <button class="primary-btn" type="button" data-class-action="show-create">+ Tạo lớp</button>
+      </div>
+    </div>
+    ${classMessageHtml()}
+    ${classState.loading ? '<p class="muted-text">Đang tải...</p>' : ''}
+    ${!classState.loading && rows.length === 0 ? '<p class="muted-text">Bạn chưa tham gia lớp nào. Tạo lớp mới hoặc nhập mã lớp để tham gia.</p>' : ''}
+    <div class="table-wrap">
+      ${rows.length > 0 ? `
+        <table>
+          <thead>
+            <tr>
+              <th>Tên lớp</th>
+              <th>Môn</th>
+              <th>Vai trò</th>
+              <th>Thành viên</th>
+              <th>Bài KT</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((c) => `
+              <tr>
+                <td>${escapeHtml(c.name)}</td>
+                <td>${escapeHtml(c.subject_slug || '-')}</td>
+                <td>${c.role === 'admin' ? 'Quản trị' : 'Thành viên'}</td>
+                <td>${Number(c.member_count || 0)}</td>
+                <td>${Number(c.quiz_count || 0)}</td>
+                <td><button class="ghost-btn" type="button" data-class-action="open-class" data-class-id="${escapeHtml(c.class_id)}">Mở lớp</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderClassCreateForm() {
+  const subjectOptions = availableSubjects.map((s) => `<option value="${escapeHtml(s.slug)}">${escapeHtml(s.name)}</option>`).join('');
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Lớp học</p>
+        <h3>Tạo lớp mới</h3>
+      </div>
+      <button class="ghost-btn" type="button" data-class-action="back-list">← Quay lại</button>
+    </div>
+    ${classMessageHtml()}
+    <form class="auth-form" data-class-form="create">
+      <label for="classNameInput">Tên lớp</label>
+      <input id="classNameInput" name="name" type="text" placeholder="VD: Lớp Mạng máy tính A1" required />
+
+      <label for="classDescInput">Mô tả (không bắt buộc)</label>
+      <input id="classDescInput" name="description" type="text" placeholder="VD: Lớp thực hành học kỳ 1" />
+
+      <label for="classSubjectInput">Môn học (không bắt buộc)</label>
+      <select id="classSubjectInput" name="subject_slug">
+        <option value="">-- Không gắn môn cụ thể --</option>
+        ${subjectOptions}
+      </select>
+
+      <button class="primary-btn" type="submit" ${classState.loading ? 'disabled' : ''}>Tạo lớp</button>
+    </form>
+  `;
+}
+
+function renderClassJoinForm() {
+  const prefill = classState.joinCodePrefill || '';
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Lớp học</p>
+        <h3>Tham gia lớp bằng mã</h3>
+      </div>
+      <button class="ghost-btn" type="button" data-class-action="back-list">← Quay lại</button>
+    </div>
+    ${classMessageHtml()}
+    <form class="auth-form" data-class-form="join">
+      <label for="classCodeInput">Mã lớp (6 ký tự do giáo viên cung cấp)</label>
+      <input id="classCodeInput" name="code" type="text" placeholder="VD: A1B2C3" maxlength="8" style="text-transform:uppercase" value="${escapeHtml(prefill)}" required />
+      <button class="primary-btn" type="submit" ${classState.loading ? 'disabled' : ''}>Tham gia</button>
+    </form>
+  `;
+  classState.joinCodePrefill = '';
+}
+
+async function handleCreateClassSubmit(form) {
+  const name = form.querySelector('#classNameInput')?.value?.trim();
+  const description = form.querySelector('#classDescInput')?.value?.trim();
+  const subjectSlug = form.querySelector('#classSubjectInput')?.value?.trim();
+  if (!name) {
+    classSetMessage('Vui lòng nhập tên lớp.', 'error');
+    renderClassCreateForm();
+    return;
+  }
+  classState.loading = true;
+  classSetMessage('');
+  renderClassCreateForm();
+  try {
+    const { data, error } = await supabase.rpc('create_class', {
+      p_name: name,
+      p_description: description || null,
+      p_subject_slug: subjectSlug || null,
+    });
+    if (error) throw error;
+    classSetMessage(`Đã tạo lớp thành công! Mã lớp: ${data.class_code}`, 'success');
+    await loadMyClasses();
+    await openClassDetail(data.id);
+  } catch (err) {
+    classSetMessage(err.message || 'Không tạo được lớp.', 'error');
+    classState.loading = false;
+    renderClassCreateForm();
+  }
+}
+
+async function handleJoinClassSubmit(form) {
+  const code = form.querySelector('#classCodeInput')?.value?.trim();
+  if (!code) {
+    classSetMessage('Vui lòng nhập mã lớp.', 'error');
+    renderClassJoinForm();
+    return;
+  }
+  classState.loading = true;
+  classSetMessage('');
+  renderClassJoinForm();
+  try {
+    const { data, error } = await supabase.rpc('join_class_by_code', { p_code: code });
+    if (error) throw error;
+    classSetMessage(`Đã tham gia lớp "${data.name}".`, 'success');
+    await loadMyClasses();
+    await openClassDetail(data.id);
+  } catch (err) {
+    classSetMessage(err.message || 'Không tham gia được lớp. Kiểm tra lại mã lớp.', 'error');
+    classState.loading = false;
+    renderClassJoinForm();
+  }
+}
+
+// ---------- 2. Chi tiết lớp ---------------------------------------------------
+
+async function openClassDetail(classId) {
+  classState.classId = classId;
+  classState.screen = 'detail';
+  classState.loading = true;
+  classSetMessage('');
+  renderClassDetailScreen();
+  try {
+    const [{ data: detail, error: detailError }, { data: quizzes, error: quizError }] = await Promise.all([
+      supabase.rpc('get_class_detail', { p_class_id: classId }),
+      supabase.rpc('get_class_quizzes', { p_class_id: classId }),
+    ]);
+    if (detailError) throw detailError;
+    if (quizError) throw quizError;
+    classState.classDetail = Array.isArray(detail) ? detail[0] : detail;
+    classState.quizzes = quizzes || [];
+  } catch (err) {
+    classSetMessage(err.message || 'Không tải được thông tin lớp.', 'error');
+  } finally {
+    classState.loading = false;
+    renderClassDetailScreen();
+  }
+}
+
+function renderClassDetailScreen() {
+  const d = classState.classDetail;
+  if (!d && classState.loading) {
+    elements.classContent.innerHTML = `<p class="muted-text">Đang tải...</p>`;
+    return;
+  }
+  if (!d) {
+    elements.classContent.innerHTML = `${classMessageHtml()}<button class="ghost-btn" type="button" data-class-action="back-list">← Quay lại danh sách lớp</button>`;
+    return;
+  }
+  const isAdmin = d.my_role === 'admin';
+  const joinUrl = `${window.location.origin}${window.location.pathname}?join=${encodeURIComponent(d.class_code)}`;
+
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Lớp học</p>
+        <h3>${escapeHtml(d.name)}</h3>
+      </div>
+      <button class="ghost-btn" type="button" data-class-action="back-list">← Danh sách lớp</button>
+    </div>
+    ${classMessageHtml()}
+    <div class="about-card" style="margin-bottom:16px;">
+      ${d.description ? `<p class="muted-text">${escapeHtml(d.description)}</p>` : ''}
+      <p class="muted-text"><strong>Mã lớp:</strong> ${escapeHtml(d.class_code)} &nbsp;|&nbsp; <strong>Thành viên:</strong> ${Number(d.member_count || 0)} &nbsp;|&nbsp; <strong>Vai trò của bạn:</strong> ${isAdmin ? 'Quản trị' : 'Thành viên'}</p>
+      ${isAdmin ? `<p class="muted-text">Chia sẻ mã <strong>${escapeHtml(d.class_code)}</strong> hoặc link sau để mời thành viên:<br/><code style="word-break:break-all;">${escapeHtml(joinUrl)}</code></p>` : ''}
+      <div class="inline-actions">
+        ${isAdmin ? `<button class="ghost-btn" type="button" data-class-action="open-members">Quản lý thành viên</button>` : ''}
+        ${isAdmin ? `<button class="primary-btn" type="button" data-class-action="show-create-quiz">+ Tạo bài kiểm tra</button>` : ''}
+        ${!isAdmin ? `<button class="ghost-btn" type="button" data-class-action="leave-class">Rời lớp</button>` : ''}
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div><p class="eyebrow">Bài kiểm tra</p></div>
+    </div>
+    <div class="table-wrap">
+      ${classState.quizzes.length === 0 ? '<p class="muted-text">Lớp chưa có bài kiểm tra nào.</p>' : `
+        <table>
+          <thead>
+            <tr>
+              <th>Tên bài</th>
+              <th>Số câu</th>
+              <th>Thời gian</th>
+              ${isAdmin ? '<th>Đã nộp</th>' : '<th>Trạng thái</th>'}
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${classState.quizzes.map((q) => `
+              <tr>
+                <td>${escapeHtml(q.title)}</td>
+                <td>${Number(q.question_count || 0)}</td>
+                <td>${q.time_limit_minutes ? escapeHtml(String(q.time_limit_minutes)) + ' phút' : 'Không giới hạn'}</td>
+                ${isAdmin
+                  ? `<td>${Number(q.submitted_count || 0)}/${Number(q.total_members || 0)}</td>`
+                  : `<td>${escapeHtml(classStatusLabel(q.my_status))}${q.my_best_percent != null ? ' - ' + Number(q.my_best_percent) + '%' : ''}</td>`
+                }
+                <td class="inline-actions">
+                  ${isAdmin ? `<button class="ghost-btn" type="button" data-class-action="view-results" data-quiz-id="${escapeHtml(q.quiz_id)}" data-quiz-title="${escapeHtml(q.title)}">Kết quả</button>` : ''}
+                  ${isAdmin ? `<button class="ghost-btn" type="button" data-class-action="delete-quiz" data-quiz-id="${escapeHtml(q.quiz_id)}">Xoá</button>` : ''}
+                  ${!isAdmin && q.my_status !== 'submitted' ? `<button class="primary-btn" type="button" data-class-action="take-quiz" data-quiz-id="${escapeHtml(q.quiz_id)}" data-quiz-title="${escapeHtml(q.title)}">${q.my_status === 'in_progress' ? 'Tiếp tục làm' : 'Làm bài'}</button>` : ''}
+                  ${!isAdmin && q.my_status === 'submitted' ? '<span class="muted-text">Đã nộp bài</span>' : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `}
+    </div>
+  `;
+}
+
+async function handleLeaveClass() {
+  if (!classState.classId) return;
+  if (!window.confirm('Bạn có chắc muốn rời lớp này?')) return;
+  try {
+    const { error } = await supabase.rpc('leave_class', { p_class_id: classState.classId });
+    if (error) throw error;
+    classState.screen = 'list';
+    classSetMessage('Đã rời lớp.', 'success');
+    await loadMyClasses();
+  } catch (err) {
+    classSetMessage(err.message || 'Không rời được lớp.', 'error');
+    renderClassDetailScreen();
+  }
+}
+
+// ---------- 3. Quản lý thành viên (admin) ------------------------------------
+
+async function openClassMembers() {
+  classState.screen = 'members';
+  classState.loading = true;
+  renderClassMembersScreen();
+  try {
+    const { data, error } = await supabase.rpc('get_class_members', { p_class_id: classState.classId });
+    if (error) throw error;
+    classState.members = data || [];
+  } catch (err) {
+    classSetMessage(err.message || 'Không tải được danh sách thành viên.', 'error');
+  } finally {
+    classState.loading = false;
+    renderClassMembersScreen();
+  }
+}
+
+function renderClassMembersScreen() {
+  const d = classState.classDetail;
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Lớp học</p>
+        <h3>Thành viên - ${escapeHtml(d?.name || '')}</h3>
+      </div>
+      <button class="ghost-btn" type="button" data-class-action="back-detail">← Quay lại lớp</button>
+    </div>
+    ${classMessageHtml()}
+    ${classState.loading ? '<p class="muted-text">Đang tải...</p>' : ''}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Tên</th><th>Email</th><th>Vai trò</th><th>Tham gia</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${classState.members.map((m) => `
+            <tr>
+              <td>${escapeHtml(m.full_name)}</td>
+              <td>${escapeHtml(m.email || '')}</td>
+              <td>${m.role === 'admin' ? 'Quản trị' : 'Thành viên'}</td>
+              <td>${formatClassDate(m.joined_at)}</td>
+              <td class="inline-actions">
+                ${m.user_id !== d?.owner_id ? `
+                  <button class="ghost-btn" type="button" data-class-action="toggle-role" data-user-id="${escapeHtml(m.user_id)}" data-current-role="${escapeHtml(m.role)}">${m.role === 'admin' ? 'Hạ xuống thành viên' : 'Nâng làm quản trị'}</button>
+                  <button class="ghost-btn" type="button" data-class-action="remove-member" data-user-id="${escapeHtml(m.user_id)}">Xoá</button>
+                ` : '<span class="muted-text">Chủ lớp</span>'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function handleToggleMemberRole(userId, currentRole) {
+  const newRole = currentRole === 'admin' ? 'member' : 'admin';
+  try {
+    const { error } = await supabase.rpc('update_class_member_role', {
+      p_class_id: classState.classId, p_user_id: userId, p_role: newRole,
+    });
+    if (error) throw error;
+    await openClassMembers();
+  } catch (err) {
+    classSetMessage(err.message || 'Không đổi được vai trò.', 'error');
+    renderClassMembersScreen();
+  }
+}
+
+async function handleRemoveMember(userId) {
+  if (!window.confirm('Xoá thành viên này khỏi lớp?')) return;
+  try {
+    const { error } = await supabase.rpc('remove_class_member', {
+      p_class_id: classState.classId, p_user_id: userId,
+    });
+    if (error) throw error;
+    await openClassMembers();
+  } catch (err) {
+    classSetMessage(err.message || 'Không xoá được thành viên.', 'error');
+    renderClassMembersScreen();
+  }
+}
+
+// ---------- 4. Tạo bài kiểm tra (admin) ---------------------------------------
+
+async function showCreateQuizForm() {
+  classState.screen = 'createQuiz';
+  classState.lessonsForQuiz = [];
+  renderCreateQuizForm();
+  const subjectSlug = classState.classDetail?.subject_slug;
+  if (subjectSlug) {
+    try {
+      const { data } = await supabase.rpc('get_lessons', { p_subject_slug: subjectSlug });
+      classState.lessonsForQuiz = data || [];
+    } catch {
+      classState.lessonsForQuiz = [];
+    }
+    renderCreateQuizForm();
+  }
+}
+
+function renderCreateQuizForm() {
+  const d = classState.classDetail;
+  const subjectOptions = availableSubjects.map((s) =>
+    `<option value="${escapeHtml(s.slug)}" ${s.slug === d?.subject_slug ? 'selected' : ''}>${escapeHtml(s.name)}</option>`
+  ).join('');
+  const lessonOptions = classState.lessonsForQuiz.map((l) =>
+    `<option value="${escapeHtml(l.lesson)}">${escapeHtml(l.lesson)} (${Number(l.question_count)} câu)</option>`
+  ).join('');
+
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Lớp học</p>
+        <h3>Tạo bài kiểm tra</h3>
+      </div>
+      <button class="ghost-btn" type="button" data-class-action="back-detail">← Quay lại lớp</button>
+    </div>
+    ${classMessageHtml()}
+    <form class="auth-form" data-class-form="createQuiz">
+      <label for="quizTitleInput">Tên bài kiểm tra</label>
+      <input id="quizTitleInput" name="title" type="text" placeholder="VD: Kiểm tra 15 phút - Bài 1" required />
+
+      <label for="quizDescInput">Mô tả (không bắt buộc)</label>
+      <input id="quizDescInput" name="description" type="text" />
+
+      <label for="quizSubjectInput">Môn học</label>
+      <select id="quizSubjectInput" name="subject_slug" data-class-onchange="quiz-subject">
+        <option value="">-- Chọn môn --</option>
+        ${subjectOptions}
+      </select>
+
+      <label for="quizLessonInput">Bài / phần (không bắt buộc)</label>
+      <select id="quizLessonInput" name="lesson">
+        <option value="">-- Tất cả các bài --</option>
+        ${lessonOptions}
+      </select>
+
+      <label for="quizCountInput">Số câu hỏi</label>
+      <input id="quizCountInput" name="question_count" type="number" min="1" max="200" value="10" required />
+
+      <label for="quizTimeInput">Thời gian làm bài (phút, để trống = không giới hạn)</label>
+      <input id="quizTimeInput" name="time_limit_minutes" type="number" min="1" max="300" />
+
+      <label for="quizAttemptsInput">Số lượt làm bài tối đa</label>
+      <input id="quizAttemptsInput" name="max_attempts" type="number" min="1" max="10" value="1" required />
+
+      <button class="primary-btn" type="submit" ${classState.loading ? 'disabled' : ''}>Tạo bài kiểm tra</button>
+    </form>
+  `;
+}
+
+async function handleCreateQuizSubjectChange(select) {
+  const subjectSlug = select.value;
+  if (!subjectSlug) {
+    classState.lessonsForQuiz = [];
+    renderCreateQuizForm();
+    return;
+  }
+  try {
+    const { data } = await supabase.rpc('get_lessons', { p_subject_slug: subjectSlug });
+    classState.lessonsForQuiz = data || [];
+  } catch {
+    classState.lessonsForQuiz = [];
+  }
+  renderCreateQuizForm();
+}
+
+async function handleCreateQuizSubmit(form) {
+  const title = form.querySelector('#quizTitleInput')?.value?.trim();
+  const description = form.querySelector('#quizDescInput')?.value?.trim();
+  const subjectSlug = form.querySelector('#quizSubjectInput')?.value?.trim();
+  const lesson = form.querySelector('#quizLessonInput')?.value?.trim();
+  const count = parseInt(form.querySelector('#quizCountInput')?.value, 10) || 10;
+  const timeLimitRaw = form.querySelector('#quizTimeInput')?.value?.trim();
+  const timeLimit = timeLimitRaw ? parseInt(timeLimitRaw, 10) : null;
+  const maxAttempts = parseInt(form.querySelector('#quizAttemptsInput')?.value, 10) || 1;
+
+  if (!title) {
+    classSetMessage('Vui lòng nhập tên bài kiểm tra.', 'error');
+    renderCreateQuizForm();
+    return;
+  }
+
+  classState.loading = true;
+  classSetMessage('');
+  renderCreateQuizForm();
+  try {
+    const { data, error } = await supabase.rpc('create_class_quiz', {
+      p_class_id: classState.classId,
+      p_title: title,
+      p_description: description || null,
+      p_subject_slug: subjectSlug || null,
+      p_lesson: lesson || null,
+      p_question_count: count,
+      p_time_limit_minutes: timeLimit,
+      p_max_attempts: maxAttempts,
+      p_start_at: null,
+      p_end_at: null,
+    });
+    if (error) throw error;
+    classSetMessage(`Đã tạo bài kiểm tra "${data.title}" với ${data.question_count} câu hỏi.`, 'success');
+    classState.loading = false;
+    await openClassDetail(classState.classId);
+  } catch (err) {
+    classSetMessage(err.message || 'Không tạo được bài kiểm tra.', 'error');
+    classState.loading = false;
+    renderCreateQuizForm();
+  }
+}
+
+async function handleDeleteQuiz(quizId) {
+  if (!window.confirm('Xoá bài kiểm tra này? Toàn bộ bài làm liên quan sẽ bị xoá.')) return;
+  try {
+    const { error } = await supabase.rpc('delete_class_quiz', { p_quiz_id: quizId });
+    if (error) throw error;
+    await openClassDetail(classState.classId);
+  } catch (err) {
+    classSetMessage(err.message || 'Không xoá được bài kiểm tra.', 'error');
+    renderClassDetailScreen();
+  }
+}
+
+// ---------- 5. Làm bài kiểm tra (học sinh) ------------------------------------
+
+async function openTakeQuiz(quizId, quizTitle) {
+  classState.screen = 'takeQuiz';
+  classState.quizId = quizId;
+  classState.takeQuizTitle = quizTitle || '';
+  classState.takeQuizIndex = 0;
+  classState.takeQuizAnswers = {};
+  classSetMessage('');
+  elements.classContent.innerHTML = `<p class="muted-text">Đang tải câu hỏi...</p>`;
+  try {
+    const { data, error } = await supabase.rpc('start_class_quiz_attempt', { p_class_quiz_id: quizId });
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Bài kiểm tra không có câu hỏi.');
+    classState.attemptId = data[0].attempt_id;
+    classState.takeQuizQuestions = data;
+
+    // Tính hạn nộp bài từ started_at THẬT trên server (không phải thời điểm
+    // client gọi hàm) - tránh việc thoát ra vào lại làm mới đồng hồ đếm ngược.
+    const timeLimitMinutes = data[0].time_limit_minutes;
+    const startedAt = data[0].started_at;
+    if (timeLimitMinutes && startedAt) {
+      classState.takeQuizDeadline = new Date(startedAt).getTime() + timeLimitMinutes * 60 * 1000;
+      if (classState.takeQuizDeadline <= Date.now()) {
+        // Hết giờ ngay khi mở lại (đã quá hạn từ trước) -> nộp bài luôn.
+        stopClassQuizTimer();
+        renderTakeQuizScreen();
+        await submitTakeQuiz(true);
+        return;
+      }
+      startClassQuizTimer();
+    } else {
+      classState.takeQuizDeadline = null;
+    }
+    renderTakeQuizScreen();
+  } catch (err) {
+    classState.screen = 'detail';
+    classSetMessage(err.message || 'Không bắt đầu được bài kiểm tra.', 'error');
+    renderClassDetailScreen();
+  }
+}
+
+function startClassQuizTimer() {
+  stopClassQuizTimer();
+  classState.takeQuizTimerId = setInterval(() => {
+    if (!classState.takeQuizDeadline) return;
+    const remainMs = classState.takeQuizDeadline - Date.now();
+    if (remainMs <= 0) {
+      stopClassQuizTimer();
+      submitTakeQuiz(true);
+      return;
+    }
+    const badge = document.getElementById('classQuizTimer');
+    if (badge) {
+      const totalSec = Math.floor(remainMs / 1000);
+      const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const ss = String(totalSec % 60).padStart(2, '0');
+      badge.textContent = `${mm}:${ss}`;
+    }
+  }, 1000);
+}
+
+function stopClassQuizTimer() {
+  if (classState.takeQuizTimerId) {
+    clearInterval(classState.takeQuizTimerId);
+    classState.takeQuizTimerId = null;
+  }
+}
+
+function renderTakeQuizScreen() {
+  const questions = classState.takeQuizQuestions;
+  const idx = classState.takeQuizIndex;
+  const q = questions[idx];
+  if (!q) return;
+
+  const options = [
+    { key: 'A', text: q.option_a },
+    { key: 'B', text: q.option_b },
+    { key: 'C', text: q.option_c },
+    { key: 'D', text: q.option_d },
+  ];
+  const selected = classState.takeQuizAnswers[q.question_id];
+  const answeredCount = Object.keys(classState.takeQuizAnswers).length;
+  const isLast = idx === questions.length - 1;
+
+  elements.classContent.innerHTML = `
+    <div class="quiz-header">
+      <div>
+        <p class="eyebrow">Đang làm bài kiểm tra lớp</p>
+        <h3>${escapeHtml(classState.takeQuizTitle)}</h3>
+      </div>
+      ${classState.takeQuizDeadline ? `<div class="timer-badge" id="classQuizTimer">--:--</div>` : ''}
+    </div>
+    <p class="muted-text">Đã trả lời ${answeredCount}/${questions.length} câu. Đáp án chỉ hiện sau khi bạn nộp bài.</p>
+    <div class="quiz-card">
+      <p class="question-index">Câu ${idx + 1}/${questions.length}</p>
+      <p class="question-text">${escapeHtml(q.question_text || '')}</p>
+      <div class="option-list">
+        ${options.map((opt) => `
+          <button class="option-btn ${selected === opt.key ? 'selected' : ''}" type="button" data-class-action="select-answer" data-key="${opt.key}">
+            <span class="option-label">${opt.key}. ${escapeHtml(opt.text || '')}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+    <div class="quiz-actions">
+      <button class="ghost-btn" type="button" data-class-action="quiz-prev" ${idx === 0 ? 'disabled' : ''}>Câu trước</button>
+      ${!isLast ? `<button class="primary-btn" type="button" data-class-action="quiz-next">Câu tiếp theo</button>` : ''}
+      ${isLast ? `<button class="primary-btn" type="button" data-class-action="quiz-submit">Nộp bài</button>` : ''}
+    </div>
+  `;
+  if (classState.takeQuizDeadline) startClassQuizTimer();
+}
+
+function handleSelectAnswer(key) {
+  const q = classState.takeQuizQuestions[classState.takeQuizIndex];
+  if (!q) return;
+  classState.takeQuizAnswers[q.question_id] = key;
+  renderTakeQuizScreen();
+}
+
+function handleQuizPrev() {
+  if (classState.takeQuizIndex > 0) {
+    classState.takeQuizIndex -= 1;
+    renderTakeQuizScreen();
+  }
+}
+
+function handleQuizNext() {
+  if (classState.takeQuizIndex < classState.takeQuizQuestions.length - 1) {
+    classState.takeQuizIndex += 1;
+    renderTakeQuizScreen();
+  }
+}
+
+async function submitTakeQuiz(auto = false) {
+  stopClassQuizTimer();
+  const unanswered = classState.takeQuizQuestions.length - Object.keys(classState.takeQuizAnswers).length;
+  if (!auto && unanswered > 0) {
+    const ok = window.confirm(`Bạn còn ${unanswered} câu chưa trả lời. Vẫn nộp bài?`);
+    if (!ok) return;
+  }
+  const answers = classState.takeQuizQuestions.map((q) => ({
+    question_id: q.question_id,
+    selected_answer: classState.takeQuizAnswers[q.question_id] || null,
+  }));
+
+  elements.classContent.innerHTML = `<p class="muted-text">Đang chấm điểm...</p>`;
+  try {
+    const { data, error } = await supabase.rpc('submit_class_quiz_attempt', {
+      p_attempt_id: classState.attemptId,
+      p_answers: answers,
+    });
+    if (error) throw error;
+    classState.reviewData = data || [];
+    const correct = classState.reviewData.filter((r) => r.is_correct).length;
+    classState.reviewSummary = { correct, total: classState.reviewData.length };
+    classState.screen = 'review';
+    renderReviewScreen();
+  } catch (err) {
+    classState.screen = 'detail';
+    classSetMessage(err.message || 'Không nộp được bài.', 'error');
+    await openClassDetail(classState.classId);
+  }
+}
+
+function renderReviewScreen() {
+  const s = classState.reviewSummary;
+  const percent = s && s.total > 0 ? Math.round((s.correct / s.total) * 1000) / 10 : 0;
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Kết quả</p>
+        <h3>${escapeHtml(classState.takeQuizTitle)}</h3>
+      </div>
+      <button class="primary-btn" type="button" data-class-action="back-detail">Xong</button>
+    </div>
+    <div class="about-card" style="margin-bottom:16px;">
+      <p><strong>Điểm: ${s ? s.correct : 0}/${s ? s.total : 0} (${percent}%)</strong></p>
+    </div>
+    ${classState.reviewData.map((r) => `
+      <div class="quiz-card" style="margin-bottom:12px;">
+        <p class="question-index">Câu ${Number(r.question_order)}</p>
+        <p class="question-text">${escapeHtml(r.question_text || '')}</p>
+        <div class="option-list">
+          ${['A', 'B', 'C', 'D'].map((key) => {
+            const text = r['option_' + key.toLowerCase()];
+            const isCorrect = key === r.correct_answer;
+            const isSelected = key === r.selected_answer;
+            const classes = ['option-btn'];
+            if (isCorrect) classes.push('correct');
+            if (isSelected && !isCorrect) classes.push('wrong');
+            return `<div class="${classes.join(' ')}"><span class="option-label">${key}. ${escapeHtml(text || '')}</span>${isCorrect ? '<strong>Đáp án đúng</strong>' : ''}</div>`;
+          }).join('')}
+        </div>
+        <div class="feedback ${r.is_correct ? 'correct' : 'incorrect'}">
+          <div class="feedback-result">${r.selected_answer ? (r.is_correct ? 'Bạn trả lời đúng.' : `Bạn chọn ${escapeHtml(r.selected_answer)}, đáp án đúng là ${escapeHtml(r.correct_answer)}.`) : `Bạn chưa trả lời câu này. Đáp án đúng là ${escapeHtml(r.correct_answer)}.`}</div>
+          ${r.explanation ? `<div class="answer-explanation"><strong>Giải thích:</strong> <span>${escapeHtml(r.explanation)}</span></div>` : ''}
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ---------- 6. Bảng tổng kết (admin) ------------------------------------------
+
+async function openQuizLeaderboard(quizId, quizTitle) {
+  classState.screen = 'quizResults';
+  classState.quizLeaderboardTitle = quizTitle || '';
+  classState.loading = true;
+  renderQuizLeaderboardScreen();
+  try {
+    const { data, error } = await supabase.rpc('get_class_quiz_leaderboard', { p_class_quiz_id: quizId });
+    if (error) throw error;
+    classState.quizLeaderboard = data || [];
+  } catch (err) {
+    classSetMessage(err.message || 'Không tải được kết quả.', 'error');
+  } finally {
+    classState.loading = false;
+    renderQuizLeaderboardScreen();
+  }
+}
+
+function renderQuizLeaderboardScreen() {
+  const rows = classState.quizLeaderboard;
+  const submitted = rows.filter((r) => r.status === 'submitted');
+  const avg = submitted.length
+    ? Math.round((submitted.reduce((sum, r) => sum + Number(r.percent || 0), 0) / submitted.length) * 10) / 10
+    : 0;
+
+  elements.classContent.innerHTML = `
+    <div class="section-header">
+      <div>
+        <p class="eyebrow">Kết quả</p>
+        <h3>${escapeHtml(classState.quizLeaderboardTitle)}</h3>
+      </div>
+      <button class="ghost-btn" type="button" data-class-action="back-detail">← Quay lại lớp</button>
+    </div>
+    ${classMessageHtml()}
+    <div class="about-card" style="margin-bottom:16px;">
+      <p class="muted-text">Đã nộp: ${submitted.length}/${rows.length} &nbsp;|&nbsp; Điểm trung bình: ${avg}%</p>
+    </div>
+    ${classState.loading ? '<p class="muted-text">Đang tải...</p>' : ''}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Đúng/Tổng</th><th>Điểm %</th><th>Nộp lúc</th></tr></thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr>
+              <td>${escapeHtml(r.full_name)}</td>
+              <td>${escapeHtml(classStatusLabel(r.status))}</td>
+              <td>${r.correct_count != null ? `${Number(r.correct_count)}/${Number(r.total_count)}` : '-'}</td>
+              <td>${r.percent != null ? Number(r.percent) + '%' : '-'}</td>
+              <td>${formatClassDate(r.submitted_at)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ---------- 7. Event delegation ----------------------------------------------
+
+function wireClassEvents() {
+  if (!elements.classContent) return;
+
+  elements.classContent.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-class-action]');
+    if (!btn) return;
+    const action = btn.dataset.classAction;
+
+    switch (action) {
+      case 'show-create':
+        classState.screen = 'create';
+        classSetMessage('');
+        renderClassScreen();
+        break;
+      case 'show-join':
+        classState.screen = 'join';
+        classSetMessage('');
+        renderClassScreen();
+        break;
+      case 'back-list':
+        classState.screen = 'list';
+        classSetMessage('');
+        renderClassListScreen();
+        break;
+      case 'back-detail':
+        classSetMessage('');
+        stopClassQuizTimer();
+        if (classState.classId) {
+          openClassDetail(classState.classId); // Tải lại dữ liệu mới nhất (điểm, trạng thái nộp bài...)
+        } else {
+          classState.screen = 'list';
+          loadMyClasses();
+        }
+        break;
+      case 'open-class':
+        openClassDetail(btn.dataset.classId);
+        break;
+      case 'open-members':
+        openClassMembers();
+        break;
+      case 'show-create-quiz':
+        showCreateQuizForm();
+        break;
+      case 'toggle-role':
+        handleToggleMemberRole(btn.dataset.userId, btn.dataset.currentRole);
+        break;
+      case 'remove-member':
+        handleRemoveMember(btn.dataset.userId);
+        break;
+      case 'delete-quiz':
+        handleDeleteQuiz(btn.dataset.quizId);
+        break;
+      case 'view-results':
+        openQuizLeaderboard(btn.dataset.quizId, btn.dataset.quizTitle);
+        break;
+      case 'take-quiz':
+        openTakeQuiz(btn.dataset.quizId, btn.dataset.quizTitle);
+        break;
+      case 'select-answer':
+        handleSelectAnswer(btn.dataset.key);
+        break;
+      case 'quiz-prev':
+        handleQuizPrev();
+        break;
+      case 'quiz-next':
+        handleQuizNext();
+        break;
+      case 'quiz-submit':
+        submitTakeQuiz(false);
+        break;
+      case 'leave-class':
+        handleLeaveClass();
+        break;
+      default:
+        break;
+    }
+  });
+
+  elements.classContent.addEventListener('change', (e) => {
+    const select = e.target.closest('[data-class-onchange="quiz-subject"]');
+    if (select) handleCreateQuizSubjectChange(select);
+  });
+
+  elements.classContent.addEventListener('submit', (e) => {
+    const form = e.target.closest('[data-class-form]');
+    if (!form) return;
+    e.preventDefault();
+    const type = form.dataset.classForm;
+    if (type === 'create') handleCreateClassSubmit(form);
+    else if (type === 'join') handleJoinClassSubmit(form);
+    else if (type === 'createQuiz') handleCreateQuizSubmit(form);
+  });
+}
+
 function wireEvents() {
   // Xóa nút "Tài khoản" khỏi menu chính (chỉ dùng ô user ở cuối sidebar để vào trang Tài khoản)
   const accountNavBtn = document.querySelector('.sidebar-item[data-nav="account"]');
@@ -2954,8 +3915,9 @@ function openPasswordRecovery(session) {
 
   // Thêm nút điều hướng câu hỏi trong màn hình làm bài
   setupQuizNavigationButtons();
- 
+
   wireEvents();
+  wireClassEvents();
 
 
   setAuthMode('login');
@@ -3000,6 +3962,21 @@ if (!configError) {
 }
 
 await checkSession();
+
+// Link mời vào lớp dạng ...?join=MACODE: nếu đã đăng nhập, tự mở sẵn form
+// tham gia lớp kèm mã (điền sẵn, không tự động nộp - vẫn cần người dùng
+// bấm "Tham gia" để xác nhận).
+try {
+  const joinCode = new URLSearchParams(window.location.search).get('join');
+  if (joinCode && currentUserId) {
+    classState.joinCodePrefill = joinCode.toUpperCase();
+    classState.screen = 'join';
+    navigateFromSidebar('classes');
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+} catch {
+  // bỏ qua nếu trình duyệt không hỗ trợ URLSearchParams
+}
 
 /*
  * Dự phòng trường hợp PASSWORD_RECOVERY xuất hiện

@@ -22,21 +22,24 @@ echo ""
 echo "=== COMMIT ==="
 
 $commitMessage = @"
-Fix: Restore Supabase project, patch XSS, refactor scoring, fix changelog & cleanup
+Add class-based quiz feature (Lop hoc - kiem tra theo lop)
 
-Changes:
-- app.js: Added escapeHtml() function for XSS mitigation (23 locations)
-- schema.sql: Consolidated schema, fixed leaderboard scoring (exam-only cumulative)
-- Fixed: subjects policy (app showed 6/8 subjects), removed quiz_attempts UPDATE policy
-- Removed icons from sw.js APP_SHELL, updated CACHE_NAME to v2
-- vercel.json: Removed dead rewrites
-- manifest.webmanifest: Consolidated to single root
-- index.html: Fixed changelog structure (all versions now expand), updated footer version to 3.0, normalized title to "Quiz App"
-- README.md: Added setup instructions
+New:
+- schema.sql: 6 new tables (classes, class_members, class_quizzes,
+  class_quiz_questions, class_quiz_attempts, class_quiz_answers) + RLS +
+  17 SECURITY DEFINER RPC functions (create_class, join_class_by_code,
+  create_class_quiz, start_class_quiz_attempt, submit_class_quiz_attempt,
+  get_class_quiz_leaderboard, ...). Server-side grading, answers not
+  exposed to client before submission. Tested idempotent (3 consecutive
+  runs) + 14-step functional/security test on local PostgreSQL 16.
+- app.js: ~1000 new lines - full "Lop hoc" UI module (class list/detail,
+  member management, quiz creation, quiz taking with timer, review,
+  admin leaderboard), event delegation, join-by-link (?join=CODE) support.
+- index.html: new sidebar nav item + classCard section container.
+- Fixed pre-existing unclosed <div class="app-shell"> tag.
+- README.md: documented the new feature + known Phase 1 limitations.
 
-Cleanup: Removed backup/, fix_leaderboard.sql, fix_leaderboard_total_score.sql, package-lock.json, public/manifest.webmanifest
-
-Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Co1t6YSVt141PuKvjL6aAc
 "@
 

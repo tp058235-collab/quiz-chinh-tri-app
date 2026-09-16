@@ -59,8 +59,43 @@ phục vụ bản cache cũ trong lúc phát triển.
 - Hiện đúng/sai ngay khi chọn đáp án, kèm giải thích nếu câu hỏi có cột `explanation`
 - Tự lưu bài đang làm dở theo từng tài khoản + từng môn, cho phép tạm dừng và làm tiếp
 - Làm lại các câu sai gần nhất
-- Lịch sử ôn tập và bảng xếp hạng
+- Lịch sử ôn tập và bảng xếp hạng cá nhân
 - Cài được như app (PWA), dùng lại được khi mất mạng
+- **Lớp học (kiểm tra theo lớp)**: tạo lớp, mời thành viên bằng mã lớp/link,
+  giáo viên tạo bài kiểm tra từ ngân hàng câu hỏi, học sinh làm bài (đáp án
+  không lộ trước khi nộp), hệ thống tự chấm và tổng hợp kết quả tập trung.
+  Xem chi tiết ở mục riêng bên dưới.
+
+## Lớp học (kiểm tra theo lớp)
+
+Vào sidebar **"Lớp học"** sau khi đăng nhập.
+
+- **Giáo viên/người tạo lớp** (vai trò `admin`): tạo lớp → nhận mã lớp 6 ký
+  tự + link mời (`?join=MÃ`) → quản lý thành viên (nâng/hạ quyền quản trị,
+  xoá thành viên) → tạo bài kiểm tra (chọn môn/bài, số câu, thời gian làm
+  bài, số lượt tối đa) → xem bảng tổng kết real-time (ai đã nộp, điểm bao
+  nhiêu, điểm trung bình lớp).
+- **Học sinh** (vai trò `member`): tham gia lớp bằng mã hoặc bấm link mời →
+  làm bài kiểm tra (chọn đáp án, có thể đổi ý trước khi nộp, không thấy
+  đúng/sai cho tới khi nộp) → xem lại chi tiết bài làm + giải thích sau khi
+  nộp.
+
+Toàn bộ logic nằm trong khối `LỚP HỌC (KIỂM TRA THEO LỚP)` ở `app.js` (UI,
+render động vào `#classContent`) và mục `5. LỚP HỌC` trong `schema.sql`
+(bảng + RLS + 17 hàm RPC). Chi tiết thiết kế đầy đủ (roadmap Phase 2/3, các
+ý tưởng mở rộng) xem file `CLASS_FEATURE_DESIGN.md`.
+
+**Giới hạn đã biết của bản Phase 1 này** (không phải lỗi, là phạm vi MVP có
+chủ đích, dự kiến bổ sung ở Phase 2/3):
+- Không lưu nháp câu trả lời giữa chừng: nếu thoát app khi đang làm bài rồi
+  quay lại "Tiếp tục làm", các câu đã chọn trước đó sẽ bị mất (chỉ mất lựa
+  chọn, không mất lượt làm bài - đồng hồ đếm ngược vẫn tính đúng từ lúc bắt
+  đầu thật, không bị "làm mới").
+- Giới hạn thời gian làm bài chỉ được ép buộc phía client (tự nộp khi hết
+  giờ); chưa có cơ chế chặn cứng phía server nếu học sinh submit trễ bằng
+  cách gọi RPC trực tiếp.
+- Chưa có: QR code dạng ảnh (mới có mã + link text), email thông báo, chống
+  gian lận nâng cao (nhiều tab, đổi thiết bị), export Excel/PDF.
 
 ## Ghi chú kỹ thuật
 
@@ -70,6 +105,13 @@ phục vụ bản cache cũ trong lúc phát triển.
 - **Lịch sử làm bài**: `app.js` truy vấn `quiz_attempts` không kèm bộ lọc
   `user_id`, việc mỗi người chỉ thấy lịch sử của mình phụ thuộc hoàn toàn vào
   policy RLS. Đừng tắt RLS trên bảng này.
+- **RLS liên bảng cho Lớp học**: `classes` và `class_members` cần kiểm tra
+  chéo lẫn nhau (ai là chủ lớp / ai là thành viên). Nếu viết policy bằng
+  subquery trực tiếp vào bảng kia sẽ bị Postgres báo lỗi "infinite recursion
+  detected in policy". Cách khắc phục đã áp dụng: 2 hàm `is_class_owner()` /
+  `is_class_member()` (SECURITY DEFINER) dùng trong policy thay vì subquery
+  thô. Nếu sau này sửa policy 2 bảng này, giữ nguyên cách dùng hàm để tránh
+  lỗi tái diễn.
 - **Cache**: `style-final-fix.css` và `app.js` được nạp kèm tham số `?v=...`
   trong `index.html`. Sau mỗi lần sửa 2 file đó, nhớ tăng số phiên bản này,
   nếu không trình duyệt cũ sẽ dùng lại bản cũ.
@@ -77,8 +119,8 @@ phục vụ bản cache cũ trong lúc phát triển.
 
 ## Việc còn lại
 
-- [ ] Vá lỗi XSS: tên hiển thị người dùng được ghép thẳng vào `innerHTML` trong
-      hàm `loadLeaderboard()` (`app.js`), cần escape HTML trước khi render.
 - [ ] Gộp `style.css` và `style-final-fix.css`, giảm bớt `!important`.
-- [ ] Đồng bộ số phiên bản: `#versionFooter` trong `index.html` còn ghi 2.5
-      trong khi phần giới thiệu đã là 3.0.
+- [ ] Lớp học Phase 2: QR code ảnh, email mời, feedback từng câu của giáo
+      viên, export Excel/PDF bảng tổng kết (xem `CLASS_FEATURE_DESIGN.md`).
+- [ ] Lớp học Phase 3: chống gian lận nâng cao, lưu nháp câu trả lời giữa
+      chừng, chặn nộp bài trễ ở phía server.
