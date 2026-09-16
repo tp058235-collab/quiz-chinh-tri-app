@@ -1,4 +1,5 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
       "source": "/reset-password",
@@ -7,30 +8,6 @@
     {
       "source": "/favicon.ico",
       "destination": "/public/favicon.png"
-    },
-    {
-      "source": "/favicon.png",
-      "destination": "/public/favicon.png"
-    },
-    {
-      "source": "/icon-192.png",
-      "destination": "/public/favicon.png"
-    },
-    {
-      "source": "/icon-512.png",
-      "destination": "/public/favicon.png"
-    },
-    {
-      "source": "/apple-touch-icon.png",
-      "destination": "/public/favicon.png"
-    },
-    {
-      "source": "/manifest.webmanifest",
-      "destination": "/public/manifest.webmanifest"
-    },
-    {
-      "source": "/sw.js",
-      "destination": "/public/sw.js"
     }
   ],
   "headers": [
@@ -49,6 +26,15 @@
         {
           "key": "Cache-Control",
           "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, max-age=0, must-revalidate"
         }
       ]
     }

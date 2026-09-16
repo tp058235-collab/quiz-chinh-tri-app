@@ -1,27 +1,43 @@
-/* public/sw.js
+/* sw.js (đặt ở thư mục gốc, đăng ký từ app.js bằng './sw.js')
    Service worker tối giản cho PWA.
    - Chỉ cache asset cùng origin.
    - Không can thiệp request cross-origin (Supabase/CDN) để tránh ảnh hưởng Auth.
    - Ưu tiên lấy dữ liệu mới khi online (network-first cho navigation).
 */
 
-const CACHE_NAME = 'on-tap-chinh-tri-v1';
+const CACHE_NAME = 'quiz-app-v2';
 
+// Chỉ liệt kê file CÓ THẬT. Đường dẫn tương đối để chạy đúng cả khi mở
+// bằng Live Server lẫn khi deploy lên Vercel.
 const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/config.js',
-  '/manifest.webmanifest',
-  '/favicon.png',
-  '/icon-192.png',
-  '/icon-512.png',
+  './',
+  './index.html',
+  './style.css',
+  './style-final-fix.css',
+  './app.js',
+  './config.js',
+  './manifest.webmanifest',
+  './public/favicon.png',
+  './public/2.png',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      // Cache từng file riêng: một file lỗi sẽ không làm hỏng cả bước cài đặt
+      // (cache.addAll() thất bại toàn bộ nếu chỉ một request trả về 404).
+      await Promise.all(
+        APP_SHELL.map((url) =>
+          cache.add(url).catch((error) => {
+            console.warn('[SW] Bỏ qua file không cache được:', url, error);
+          })
+        )
+      );
+
+      await self.skipWaiting();
+    })()
   );
 });
 
@@ -57,7 +73,7 @@ async function networkFirst(request) {
 
     // Fallback cho navigation offline
     if (request.mode === 'navigate') {
-      const cachedIndex = await cache.match('/index.html');
+      const cachedIndex = await cache.match('./index.html');
       if (cachedIndex) return cachedIndex;
     }
 
@@ -89,6 +105,15 @@ self.addEventListener('fetch', (event) => {
   if (!isSameOrigin(request)) return;
 
   const url = new URL(request.url);
+
+  // Không bao giờ cache chính service worker (để bản mới được nhận ngay).
+  if (url.pathname.endsWith('/sw.js')) return;
+
+  // Trang đặt lại mật khẩu luôn phải lấy bản mới (link chứa token dùng 1 lần).
+  if (url.pathname.includes('reset-password')) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
 
   // Network-first cho navigation để luôn ưu tiên nội dung mới khi online
   if (request.mode === 'navigate') {

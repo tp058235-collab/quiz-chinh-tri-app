@@ -189,6 +189,22 @@ function isValidUuid(value) {
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+/**
+ * Chuyển ký tự đặc biệt của HTML thành entity trước khi ghép vào innerHTML.
+ * BẮT BUỘC dùng cho mọi dữ liệu lấy từ Supabase (tên người dùng, nội dung câu
+ * hỏi, tên môn...). Nếu không, một người dùng chỉ cần đổi tên hiển thị thành
+ * một đoạn thẻ HTML là có thể chèn mã chạy trong trình duyệt của người khác.
+ */
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 
 function ensureVersionFooterPlacement() {
   const versionFooter = document.getElementById('versionFooter');
@@ -967,7 +983,7 @@ async function loadLessons() {
     ];
 
     elements.lessonSelect.innerHTML = options
-      .map((opt) => `<option value="${String(opt.value).replace(/"/g, '&quot;')}">${opt.label}</option>`)
+      .map((opt) => `<option value="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</option>`)
       .join('');
 
     if (options.some((o) => o.value === current)) {
@@ -1314,7 +1330,7 @@ function renderSubjectCards() {
         card.type = 'button';
         card.dataset.slug = subject.slug;
         card.innerHTML = `
-            <span class="subject-name-final">${subject.name}</span>
+            <span class="subject-name-final">${escapeHtml(subject.name)}</span>
         `;
         card.addEventListener('click', () => {
             selectedSubjectSlug = subject.slug;
@@ -2127,7 +2143,7 @@ async function startExam(totalQuestions) {
       });
       loadError = error.message || 'Không lấy được câu hỏi từ Supabase.';
       elements.quizStatus.textContent = loadError;
-      elements.quizCard.innerHTML = `<p class="muted-text">${loadError}</p>`;
+      elements.quizCard.innerHTML = `<p class="muted-text">${escapeHtml(loadError)}</p>`;
       setStatus(loadError, 'error');
       showSection('dashboard');
       return;
@@ -2136,7 +2152,7 @@ async function startExam(totalQuestions) {
     if (!Array.isArray(data) || data.length === 0) {
       loadError = 'Môn học này hiện chưa có câu hỏi. Vui lòng chọn môn khác (như Chính Trị, Cơ Sở Dữ Liệu) hoặc thêm dữ liệu vào Supabase.';
       elements.quizStatus.textContent = loadError;
-      elements.quizCard.innerHTML = `<p class="muted-text">${loadError}</p>`;
+      elements.quizCard.innerHTML = `<p class="muted-text">${escapeHtml(loadError)}</p>`;
       setStatus(loadError, 'error');
       showSection('dashboard');
       return;
@@ -2293,7 +2309,7 @@ function renderQuestion() {
 
   elements.quizCard.innerHTML = `
     <p class="question-index">Câu ${currentQuestionIndex + 1}/${questions.length}</p>
-    <p class="question-text">${question.question_text || 'Câu hỏi không có nội dung.'}</p>
+    <p class="question-text">${escapeHtml(question.question_text || 'Câu hỏi không có nội dung.')}</p>
     <div class="option-list">
       ${options.map((option) => {
         const selected = selectedAnswers[currentQuestionIndex] === option.key;
@@ -2311,7 +2327,7 @@ function renderQuestion() {
         }
         return `
           <button class="${classes.join(' ')}" data-choice="${option.key}" ${isDisabled ? 'disabled' : ''}>
-            <span class="option-label">${option.key}. ${option.text}</span>
+            <span class="option-label">${escapeHtml(option.key)}. ${escapeHtml(option.text)}</span>
             ${isAnswered && correct ? '<strong>Đáp án đúng</strong>' : ''}
           </button>`;
       }).join('')}
@@ -2326,10 +2342,10 @@ function renderQuestion() {
       ${
         selectedAnswers[currentQuestionIndex] === question.correct_answer
           ? 'Chính xác! Bạn đã chọn đáp án đúng.'
-          : `Sai rồi. Đáp án đúng là ${question.correct_answer}: ${
-              question[
-                'option_' + question.correct_answer.toLowerCase()
-              ]
+          : `Sai rồi. Đáp án đúng là ${escapeHtml(question.correct_answer)}: ${
+              escapeHtml(question[
+                'option_' + String(question.correct_answer || '').toLowerCase()
+              ])
             }.`
       }
     </div>
@@ -2339,7 +2355,7 @@ function renderQuestion() {
         ? `
           <div class="answer-explanation">
             <strong>Giải thích:</strong>
-            <span>${question.explanation}</span>
+            <span>${escapeHtml(question.explanation)}</span>
           </div>
         `
         : ''
@@ -2534,13 +2550,13 @@ async function loadHistory() {
         const duration = `${Math.floor(item.duration_seconds / 60)} phút ${item.duration_seconds % 60}s`;
         return `
           <tr>
-            <td>${createdAt}</td>
-            <td>${item.mode}</td>
-            <td>${item.total_questions}</td>
-            <td>${item.correct_count ?? item.correct_answers ?? 0}</td>
-            <td>${item.wrong_count ?? item.wrong_answers ?? 0}</td>
-            <td>${item.score_percent}%</td>
-            <td>${duration}</td>
+            <td>${escapeHtml(createdAt)}</td>
+            <td>${escapeHtml(item.mode)}</td>
+            <td>${escapeHtml(item.total_questions)}</td>
+            <td>${escapeHtml(item.correct_count ?? item.correct_answers ?? 0)}</td>
+            <td>${escapeHtml(item.wrong_count ?? item.wrong_answers ?? 0)}</td>
+            <td>${escapeHtml(item.score_percent)}%</td>
+            <td>${escapeHtml(duration)}</td>
           </tr>`;
       })
       .join('');
@@ -2616,7 +2632,7 @@ async function loadLeaderboard() {
 
       elements.leaderboardTableBody.innerHTML =
         `<tr><td colspan="4">Không thể tải bảng xếp hạng: ${
-          error.message || 'Lỗi không xác định'
+          escapeHtml(error.message || 'Lỗi không xác định')
         }</td></tr>`;
       return;
     }
@@ -2638,10 +2654,10 @@ async function loadLeaderboard() {
 
         return `
           <tr>
-            <td>${item.rank ?? index + 1}</td>
-            <td>${item.full_name ?? 'Không tên'}</td>
-            <td>${scoreText}</td>
-            <td>${item.attempts ?? 0}</td>
+            <td>${escapeHtml(item.rank ?? index + 1)}</td>
+            <td>${escapeHtml(item.full_name ?? 'Không tên')}</td>
+            <td>${escapeHtml(scoreText)}</td>
+            <td>${escapeHtml(item.attempts ?? 0)}</td>
           </tr>`;
       })
       .join('');
@@ -2655,7 +2671,7 @@ async function loadLeaderboard() {
 
     elements.leaderboardTableBody.innerHTML =
       `<tr><td colspan="4">Không thể tải bảng xếp hạng: ${
-        error?.message || 'Lỗi không xác định'
+        escapeHtml(error?.message || 'Lỗi không xác định')
       }</td></tr>`;
   }
 }
