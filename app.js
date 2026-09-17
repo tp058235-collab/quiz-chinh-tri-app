@@ -886,8 +886,17 @@ function setAuthMode(mode) {
 
   elements.confirmPasswordInput.hidden = !isRegister;
   elements.confirmPasswordLabel.hidden = !isRegister;
+
+  const confirmToggleBtn = document.querySelector('[data-password-toggle="confirmPasswordInput"]');
+  if (confirmToggleBtn) confirmToggleBtn.hidden = !isRegister;
+
   if (!isRegister) {
     elements.confirmPasswordInput.value = '';
+    elements.confirmPasswordInput.type = 'password';
+    if (confirmToggleBtn) {
+      confirmToggleBtn.setAttribute('aria-pressed', 'false');
+      confirmToggleBtn.setAttribute('aria-label', 'Hiện mật khẩu nhập lại');
+    }
   }
 }
 
@@ -3685,6 +3694,26 @@ function wireEvents() {
 
   elements.modeChips.forEach((chip) => {
     chip.addEventListener('click', () => setAuthMode(chip.dataset.authMode));
+  });
+
+  // Nút "hiện/ẩn mật khẩu" (icon con mắt) - cho phép xem rõ ký tự đã gõ
+  // trước khi bấm đăng nhập, tránh trường hợp autofill/gõ nhầm mà không
+  // để ý (đặc biệt hay gặp trên điện thoại).
+  document.querySelectorAll('.password-toggle-btn[data-password-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetInput = document.getElementById(btn.dataset.passwordToggle);
+      if (!targetInput) return;
+      const willShow = targetInput.type === 'password';
+      targetInput.type = willShow ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', String(willShow));
+      btn.setAttribute(
+        'aria-label',
+        willShow
+          ? (btn.dataset.passwordToggle === 'confirmPasswordInput' ? 'Ẩn mật khẩu nhập lại' : 'Ẩn mật khẩu')
+          : (btn.dataset.passwordToggle === 'confirmPasswordInput' ? 'Hiện mật khẩu nhập lại' : 'Hiện mật khẩu')
+      );
+      targetInput.focus({ preventScroll: true });
+    });
   });
 
   elements.authForm.addEventListener('submit', handleAuthSubmit);

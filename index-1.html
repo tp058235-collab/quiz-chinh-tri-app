@@ -25,51 +25,6 @@
       html body [hidden] {
         display: none !important;
       }
-
-      /* Nút "hiện/ẩn mật khẩu" (icon con mắt) trong ô mật khẩu */
-      .password-field-wrap {
-        position: relative;
-        display: flex;
-        align-items: center;
-      }
-      .password-field-wrap input {
-        width: 100%;
-        box-sizing: border-box;
-        padding-right: 2.5rem;
-      }
-      .password-toggle-btn {
-        position: absolute;
-        right: 0.4rem;
-        top: 50%;
-        transform: translateY(-50%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 2rem;
-        height: 2rem;
-        padding: 0;
-        margin: 0;
-        border: none;
-        background: none;
-        color: #64748b;
-        cursor: pointer;
-        line-height: 0;
-        border-radius: 6px;
-      }
-      .password-toggle-btn:hover,
-      .password-toggle-btn:focus-visible {
-        color: #1e293b;
-        background: rgba(100, 116, 139, 0.12);
-      }
-      .password-toggle-btn .icon-eye-off {
-        display: none;
-      }
-      .password-toggle-btn[aria-pressed="true"] .icon-eye {
-        display: none;
-      }
-      .password-toggle-btn[aria-pressed="true"] .icon-eye-off {
-        display: block;
-      }
     </style>
   </head>
     <body>
@@ -184,52 +139,19 @@
 
             <label for="passwordInput">Mật khẩu</label>
 
-            <div class="password-field-wrap">
-              <input
-                id="passwordInput"
-                type="password"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                autocapitalize="none"
-                autocorrect="off"
-                spellcheck="false"
-                required
-              />
-              <button
-                type="button"
-                class="password-toggle-btn"
-                data-password-toggle="passwordInput"
-                aria-label="Hiện mật khẩu"
-                aria-pressed="false"
-              >
-                <svg class="icon-eye" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-                  <path fill="currentColor" d="M12 5c-5.5 0-9.5 4.5-10.5 7 1 2.5 5 7 10.5 7s9.5-4.5 10.5-7c-1-2.5-5-7-10.5-7zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
-                </svg>
-                <svg class="icon-eye-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-                  <path fill="currentColor" d="M3.28 2.22 2.22 3.28l3.4 3.4C3.53 8.1 1.94 9.9 1 12c1 2.5 5 7 11 7 1.98 0 3.75-.5 5.26-1.28l3.24 3.24 1.06-1.06L3.28 2.22zM12 16.5c-.57 0-1.13-.1-1.65-.28l-1.62-1.62a4.5 4.5 0 0 0 5.87-5.87l1.62 1.62c.18.52.28 1.08.28 1.65a4.5 4.5 0 0 1-4.5 4.5zm0-11c1.86 0 3.65.42 5.18 1.15l-1.53 1.53A9.1 9.1 0 0 0 12 7.5c-5 0-8.4 3.7-9.4 5.7.32.6.84 1.46 1.6 2.35l-1.43 1.43C1.4 15.15.3 13.55 0 12c1-2.5 5-7 12-7z"/>
-                </svg>
-              </button>
-            </div>
+            <input
+              id="passwordInput"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              autocapitalize="none"
+              autocorrect="off"
+              spellcheck="false"
+              required
+            />
 
             <label for="confirmPasswordInput" id="confirmPasswordLabel" hidden>Nhập lại mật khẩu</label>
-            <div class="password-field-wrap">
-              <input id="confirmPasswordInput" type="password" placeholder="Nhập lại mật khẩu" hidden />
-              <button
-                type="button"
-                class="password-toggle-btn"
-                data-password-toggle="confirmPasswordInput"
-                aria-label="Hiện mật khẩu nhập lại"
-                aria-pressed="false"
-                hidden
-              >
-                <svg class="icon-eye" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-                  <path fill="currentColor" d="M12 5c-5.5 0-9.5 4.5-10.5 7 1 2.5 5 7 10.5 7s9.5-4.5 10.5-7c-1-2.5-5-7-10.5-7zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
-                </svg>
-                <svg class="icon-eye-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-                  <path fill="currentColor" d="M3.28 2.22 2.22 3.28l3.4 3.4C3.53 8.1 1.94 9.9 1 12c1 2.5 5 7 11 7 1.98 0 3.75-.5 5.26-1.28l3.24 3.24 1.06-1.06L3.28 2.22zM12 16.5c-.57 0-1.13-.1-1.65-.28l-1.62-1.62a4.5 4.5 0 0 0 5.87-5.87l1.62 1.62c.18.52.28 1.08.28 1.65a4.5 4.5 0 0 1-4.5 4.5zm0-11c1.86 0 3.65.42 5.18 1.15l-1.53 1.53A9.1 9.1 0 0 0 12 7.5c-5 0-8.4 3.7-9.4 5.7.32.6.84 1.46 1.6 2.35l-1.43 1.43C1.4 15.15.3 13.55 0 12c1-2.5 5-7 12-7z"/>
-                </svg>
-              </button>
-            </div>
+            <input id="confirmPasswordInput" type="password" placeholder="Nhập lại mật khẩu" hidden />
 
             <button id="authSubmitBtn" class="primary-btn" type="submit">Đăng nhập</button>
           </form>
@@ -457,7 +379,7 @@
       </div>
       </div>
 
-    <script type="module" src="./app.js?v=20260917-1"></script>
+    <script type="module" src="./app.js?v=20260916-2"></script>
 
   </body>
 </html>
