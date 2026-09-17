@@ -26,49 +26,64 @@
         display: none !important;
       }
 
-      /* Nút "hiện/ẩn mật khẩu" (icon con mắt) trong ô mật khẩu */
+      /* Nút "hiện/ẩn mật khẩu" (icon con mắt) trong ô mật khẩu.
+         Ghi chú: style-final-fix.css có luật chung cho mọi button/input
+         dùng !important (min-height 44px, padding, border...) nên ở đây
+         phải dùng !important để thắng, nếu không nút sẽ hiện thành một
+         ô vuông trống thay vì icon nhỏ căn giữa. */
       .password-field-wrap {
-        position: relative;
-        display: flex;
-        align-items: center;
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
       }
       .password-field-wrap input {
-        width: 100%;
-        box-sizing: border-box;
-        padding-right: 2.5rem;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding-right: 2.75rem !important;
       }
       .password-toggle-btn {
-        position: absolute;
-        right: 0.4rem;
-        top: 50%;
-        transform: translateY(-50%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 2rem;
-        height: 2rem;
-        padding: 0;
-        margin: 0;
-        border: none;
-        background: none;
-        color: #64748b;
-        cursor: pointer;
-        line-height: 0;
-        border-radius: 6px;
+        position: absolute !important;
+        right: 0.3rem !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 2.1rem !important;
+        height: 2.1rem !important;
+        min-height: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 50% !important;
+        background: transparent !important;
+        color: #64748b !important;
+        cursor: pointer !important;
+        line-height: 0 !important;
+        box-shadow: none !important;
       }
       .password-toggle-btn:hover,
       .password-toggle-btn:focus-visible {
-        color: #1e293b;
-        background: rgba(100, 116, 139, 0.12);
+        transform: translateY(-50%) !important;
+        color: #1e293b !important;
+        background: rgba(100, 116, 139, 0.14) !important;
+        box-shadow: none !important;
+      }
+      .password-toggle-btn svg {
+        display: block !important;
+        width: 20px !important;
+        height: 20px !important;
+        pointer-events: none !important;
       }
       .password-toggle-btn .icon-eye-off {
-        display: none;
+        display: none !important;
       }
       .password-toggle-btn[aria-pressed="true"] .icon-eye {
-        display: none;
+        display: none !important;
       }
       .password-toggle-btn[aria-pressed="true"] .icon-eye-off {
-        display: block;
+        display: block !important;
       }
     </style>
   </head>
