@@ -1,5 +1,5 @@
 {
-  "name": "on-tap-chinh-tri",
+  "name": "quiz-app",
   "private": true,
   "scripts": {
     "build": "echo \"No build step (static PWA)\""

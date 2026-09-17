@@ -48,6 +48,27 @@ Login UX / mobile login fixes:
   typed before submitting - helps diagnose stale-autofill mismatches
   on mobile.
 - Cache-bust bumped to app.js?v=20260917-1.
+- Fixed password-toggle icon being clobbered by the global !important
+  button/input reset in style-final-fix.css (was rendering as a blank
+  square instead of the eye icon).
+
+Backend fix (already applied live via Supabase MCP, file synced here):
+- schema.sql: get_class_members() cast u.email to ::text - real
+  auth.users.email is varchar(255), which does not structurally match
+  a RETURNS TABLE column declared as text. Caused every class member
+  list to silently fail. Local test mocks had email as plain text so
+  this was not caught before deploy.
+
+Consistency / polish pass:
+- Synced "Quiz App" naming across index.html, reset-password.html and
+  package.json (was still "on-tap-chinh-tri" from the old single-subject
+  app).
+- Added meta description + Open Graph/Twitter tags to index.html so
+  shared links (e.g. class invite links) get a proper preview card.
+- Added meta description + noindex to reset-password.html.
+- Removed redundant duplicate alt text on the two logo images.
+- app.js: added "Mang cap quang" to the offline FALLBACK_SUBJECTS list
+  (the subject itself was added directly to the live subjects table).
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Co1t6YSVt141PuKvjL6aAc

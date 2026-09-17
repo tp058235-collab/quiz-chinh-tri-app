@@ -791,7 +791,7 @@ begin
     select
       cm.user_id,
       coalesce(nullif(trim(p.full_name), ''), nullif(split_part(u.email, '@', 1), ''), 'Không tên'),
-      u.email, cm.role, cm.joined_at
+      u.email::text, cm.role, cm.joined_at
     from public.class_members cm
     left join public.profiles p on p.user_id = cm.user_id
     left join auth.users      u on u.id      = cm.user_id

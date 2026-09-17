@@ -149,6 +149,7 @@ const FALLBACK_SUBJECTS = [
     { id: 'phap-luat-id', name: 'Pháp Luật', slug: 'phap-luat' },
     { id: 'co-so-du-lieu-id', name: 'Cơ Sở Dữ Liệu', slug: 'co-so-du-lieu' },
     { id: 'ky-nang-mem-id', name: 'Kỹ Năng Mềm', slug: 'ky-nang-mem' },
+    { id: 'mang-cap-quang-id', name: 'Mạng Cáp Quang', slug: 'mang-cap-quang' },
 ];
 let availableSubjects = [];
 
